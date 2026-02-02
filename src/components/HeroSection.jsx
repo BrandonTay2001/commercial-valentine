@@ -4,7 +4,7 @@ import { BsArrowDown } from 'react-icons/bs';
 
 const HeroSection = () => {
     return (
-        <section className="snap-section relative z-10">
+        <section id="hero" className="snap-section relative z-10">
             <div className="container mx-auto px-4 flex flex-col items-center justify-center text-center">
 
                 {/* Main Title Group */}

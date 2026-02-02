@@ -83,7 +83,7 @@ const StoryMap = () => {
     const currentCp = checkpoints[activeCheckpoint];
 
     return (
-        <section id="map-section" className="snap-section relative w-full h-full bg-white overflow-hidden">
+        <section id="map" className="snap-section relative w-full h-full bg-white overflow-hidden">
             {/* Map Container */}
             <div className="absolute inset-0 z-0">
                 <Map
