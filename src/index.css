@@ -1,68 +1,64 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  html {
+    @apply scroll-smooth;
   }
-  a:hover {
-    color: #747bff;
+
+  body {
+    @apply bg-stone-50 text-secondary antialiased overflow-hidden m-0 p-0 w-full h-full;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@layer components {
+  .snap-container {
+    @apply h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth p-0 m-0;
+  }
+
+  /* Force min-height to ensure intersection observer works */
+  .snap-section {
+    @apply h-screen w-full snap-start snap-always relative flex-shrink-0;
+  }
+
+  .glass-panel {
+    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-xl;
+  }
+
+  .glass-panel-flat {
+    @apply bg-white/95 backdrop-blur-xl border-none shadow-none;
+  }
+
+  .glass-capsule {
+    @apply bg-white/20 backdrop-blur-md border border-white/30 rounded-full px-8 py-3 shadow-lg hover:bg-white/30 transition-all;
+  }
+
+  .text-display {
+    font-family: 'Great Vibes', cursive;
+  }
+
+  /* Hide scrollbar */
+  .snap-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .snap-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Custom Scrollbar for internal overflow */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
   }
 }

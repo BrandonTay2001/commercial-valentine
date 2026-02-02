@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { FaHeart, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabase';
 import PhotoJournal from './PhotoJournal';
@@ -8,7 +8,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 const ITEM_HEIGHT = 120;
 
-const StoryMap = () => {
+const StoryMap = ({ mapStylePreset }) => {
     const mapRef = useRef(null);
     const [checkpoints, setCheckpoints] = useState([]);
     const [activeCheckpoint, setActiveCheckpoint] = useState(0);
@@ -42,11 +42,16 @@ const StoryMap = () => {
     };
 
     const flyToLocation = (index) => {
+        // Strict Bounds Check
+        if (index < 0) index = 0;
+        if (index >= checkpoints.length) index = checkpoints.length - 1;
+
         if (!mapRef.current || !checkpoints[index]) return;
-        const target = checkpoints[index];
+
         setActiveCheckpoint(index);
         setJournalOpen(false);
 
+        const target = checkpoints[index];
         const map = mapRef.current.getMap();
         map.flyTo({
             center: [target.longitude, target.latitude],
@@ -58,19 +63,32 @@ const StoryMap = () => {
         });
     };
 
-    // Improved Drag Logic
-    const onDragEnd = (event, info) => {
-        const offset = info.offset.y;
-        const velocity = info.velocity.y;
+    // "Remote Control" Drag Logic
+    // Instead of dragging the list, we drag an invisible proxy that updates the state
+    const handleDragEnd = (_, info) => {
+        const { offset, velocity } = info;
+        const swipeThreshold = 50;
 
-        // More sensitive threshold for mobile
-        const threshold = 30;
-        const velocityThreshold = 200;
+        // Hand-off Logic (Explicit)
+        if (activeCheckpoint === 0 && offset.y > 100) {
+            document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
+        if (activeCheckpoint === checkpoints.length - 1 && offset.y < -100) {
+            document.getElementById('footer')?.scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
 
-        if (offset < -threshold || velocity < -velocityThreshold) {
-            if (activeCheckpoint < checkpoints.length - 1) flyToLocation(activeCheckpoint + 1);
-        } else if (offset > threshold || velocity > velocityThreshold) {
-            if (activeCheckpoint > 0) flyToLocation(activeCheckpoint - 1);
+        // Logic: Swipe Down (Positive Y) -> Previous Item
+        // Logic: Swipe Up (Negative Y) -> Next Item
+        if (offset.y > swipeThreshold || velocity.y > 300) {
+            if (activeCheckpoint > 0) {
+                flyToLocation(activeCheckpoint - 1);
+            }
+        } else if (offset.y < -swipeThreshold || velocity.y < -300) {
+            if (activeCheckpoint < checkpoints.length - 1) {
+                flyToLocation(activeCheckpoint + 1);
+            }
         }
     };
 
@@ -82,15 +100,32 @@ const StoryMap = () => {
 
     const currentCp = checkpoints[activeCheckpoint];
 
+    const MAP_STYLE = mapStylePreset || "mapbox://styles/mapbox/light-v11";
+    const isDarkStyle = MAP_STYLE.includes('dark') || MAP_STYLE.includes('satellite');
+
+    // Dynamic Theme Colors
+    const theme = {
+        textPrimary: isDarkStyle ? 'text-white' : 'text-primary',
+        textSecondary: isDarkStyle ? 'text-stone-300' : 'text-secondary',
+        textMuted: isDarkStyle ? 'text-white/40' : 'text-stone-400',
+        border: isDarkStyle ? 'border-white/10' : 'border-stone-100',
+        borderActive: 'border-red-400',
+        glass: isDarkStyle ? 'bg-black/40 border-white/10' : 'bg-white/10 border-white/20',
+        gradientFrom: isDarkStyle ? 'from-stone-900/90' : 'from-white/90',
+        gradientVia: isDarkStyle ? 'via-stone-900/40' : 'via-white/20',
+        gradientMobile: isDarkStyle ? 'from-stone-900/60' : 'from-white/60',
+        markerInactive: isDarkStyle ? 'text-white/30' : 'text-stone-300'
+    };
+
     return (
-        <section id="map" className="snap-section relative w-full h-full bg-white overflow-hidden">
+        <section id="map" className={`snap-section relative w-full h-full overflow-hidden transition-colors duration-1000 ${isDarkStyle ? 'bg-stone-900' : 'bg-white'}`}>
             {/* Map Container */}
             <div className="absolute inset-0 z-0">
                 <Map
                     ref={mapRef}
                     {...viewState}
                     onMove={evt => setViewState(evt.viewState)}
-                    mapStyle="mapbox://styles/mapbox/light-v11"
+                    mapStyle={MAP_STYLE}
                     mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
                     dragRotate={false}
                 >
@@ -103,29 +138,26 @@ const StoryMap = () => {
                         >
                             <div
                                 onClick={() => flyToLocation(index)}
-                                className={`text-3xl cursor-pointer transition-transform duration-500 ${activeCheckpoint === index ? 'scale-125 text-red-500' : 'scale-100 text-stone-300 opacity-60'}`}
+                                className={`text-3xl cursor-pointer transition-transform duration-500 ${activeCheckpoint === index ? 'scale-125 text-red-500' : `scale-100 ${theme.markerInactive} opacity-60`}`}
                             >
                                 <FaHeart className="drop-shadow-lg" />
                             </div>
                         </Marker>
                     ))}
                 </Map>
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-white/90 via-white/20 to-transparent md:block hidden" />
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/60 via-transparent to-white/60 md:hidden block" />
+                <div className={`absolute inset-0 pointer-events-none bg-gradient-to-r ${theme.gradientFrom} ${theme.gradientVia} to-transparent md:block hidden`} />
+                <div className={`absolute inset-0 pointer-events-none bg-gradient-to-b ${theme.gradientMobile} via-transparent ${theme.gradientMobile} md:hidden block`} />
             </div>
 
-            {/* Wheel Scroller UI - Accessible on Mobile via Wide Drag */}
+            {/* Wheel Scroller UI */}
             <div className="absolute left-0 md:left-20 top-1/2 -translate-y-1/2 z-20 w-full md:w-80 h-[400px] overflow-hidden select-none touch-none">
-                {/* Midline helper */}
-                <div className="absolute top-1/2 left-0 w-full h-px bg-red-300 opacity-10 z-0 pointer-events-none"></div>
+                {/* Visual Midline */}
+                <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
 
+                {/* The List (Controlled by State, Not Drag) */}
                 <motion.div
-                    className="absolute top-1/2 left-0 w-full h-full cursor-grab active:cursor-grabbing"
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
-                    dragElastic={0.5}
-                    onDragEnd={onDragEnd}
-                    style={{ y: -activeCheckpoint * ITEM_HEIGHT }}
+                    className="absolute top-1/2 left-0 w-full"
+                    initial={false}
                     animate={{ y: -activeCheckpoint * ITEM_HEIGHT }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 >
@@ -134,27 +166,27 @@ const StoryMap = () => {
                         return (
                             <motion.div
                                 key={point.id}
-                                className={`h-[120px] flex flex-col justify-center px-10 md:pl-8 md:pr-0 border-l-4 md:border-l-2 transition-all cursor-pointer ${isActive ? 'border-red-400 opacity-100' : 'border-stone-100 opacity-20'}`}
+                                className={`h-[120px] flex flex-col justify-center px-10 md:pl-8 md:pr-0 border-l-4 md:border-l-2 transition-all cursor-pointer ${isActive ? 'border-red-400 opacity-100' : `${theme.border} opacity-20`}`}
                                 onClick={() => flyToLocation(idx)}
                                 animate={{
-                                    scale: isActive ? 1.1 : 0.85,
+                                    scale: isActive ? 1.05 : 0.9,
                                     x: isActive ? (window.innerWidth < 768 ? 20 : 10) : 0,
-                                    opacity: isActive ? 1 : 0.2
+                                    opacity: isActive ? 1 : 0.3
                                 }}
                             >
-                                <h4 className={`font-serif text-3xl md:text-3xl lg:text-4xl leading-tight ${isActive ? 'text-primary' : 'text-stone-400'}`}>
+                                <h4 className={`font-serif text-3xl md:text-3xl lg:text-4xl leading-tight ${isActive ? theme.textPrimary : theme.textMuted}`}>
                                     {point.title}
                                 </h4>
-                                <p className="text-xs md:text-sm text-secondary font-mono mb-1 tracking-widest">{point.date}</p>
+                                <p className={`text-xs md:text-sm ${theme.textSecondary} font-mono mb-1 tracking-widest`}>{point.date}</p>
 
                                 {isActive && (
                                     <motion.button
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         onClick={(e) => { e.stopPropagation(); setJournalOpen(true); }}
-                                        className="mt-3 text-[10px] md:text-xs uppercase tracking-[0.3em] text-red-400 font-bold hover:text-red-600 transition-colors flex items-center gap-2"
+                                        className="mt-3 text-[10px] md:text-xs uppercase tracking-[0.3em] text-red-500 font-bold hover:text-red-600 transition-colors flex items-center gap-2"
                                     >
-                                        Explore Memories →
+                                        Explore Moments →
                                     </motion.button>
                                 )}
                             </motion.div>
@@ -162,9 +194,19 @@ const StoryMap = () => {
                     })}
                 </motion.div>
 
+                {/* INVISIBLE DRAG OVERLAY - The "Drivers Seat" */}
+                <motion.div
+                    className="absolute inset-0 z-30 cursor-grab active:cursor-grabbing"
+                    drag="y"
+                    dragConstraints={{ top: 0, bottom: 0 }}
+                    dragElastic={0}
+                    onDragEnd={handleDragEnd}
+                    style={{ opacity: 0 }}
+                />
+
                 {/* Fade Masks */}
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-white via-white/60 to-transparent pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/60 to-transparent pointer-events-none" />
+                <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
+                <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
             </div>
 
             {/* Desktop Description Panel (Right) */}
@@ -174,13 +216,13 @@ const StoryMap = () => {
                         initial={{ opacity: 0, x: 50 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 50 }}
-                        className="absolute right-10 top-1/2 -translate-y-1/2 w-80 glass-panel p-10 z-20 hidden lg:block"
+                        className={`absolute right-10 top-1/2 -translate-y-1/2 w-80 backdrop-blur-md border rounded-3xl p-10 z-20 hidden lg:block ${theme.glass}`}
                     >
-                        <h3 className="text-display text-4xl mb-4 text-primary leading-tight">{currentCp.title}</h3>
-                        <p className="font-serif italic text-lg text-secondary mb-8 leading-relaxed">
+                        <h3 className={`text-display text-4xl mb-4 leading-tight ${theme.textPrimary}`}>{currentCp.title}</h3>
+                        <p className={`font-serif italic text-lg mb-8 leading-relaxed ${theme.textSecondary}`}>
                             "{currentCp.description}"
                         </p>
-                        <div className="w-16 h-1 bg-stone-100 rounded-full" />
+                        <div className={`w-16 h-1 rounded-full ${isDarkStyle ? 'bg-white/10' : 'bg-stone-100'}`} />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -199,9 +241,9 @@ const StoryMap = () => {
                         <div className="relative w-full h-full max-w-7xl glass-panel-flat md:glass-panel shadow-2xl overflow-y-auto p-8 md:p-16 custom-scrollbar">
                             <button
                                 onClick={() => setJournalOpen(false)}
-                                className="fixed top-6 right-6 p-4 bg-white shadow-xl rounded-full hover:bg-stone-50 transition-all z-[70] active:scale-90"
+                                className="fixed top-6 right-6 p-4 bg-white shadow-xl rounded-full hover:bg-stone-50 transition-all z-[70] active:scale-95 text-stone-900"
                             >
-                                <FaTimes className="text-primary text-xl" />
+                                <FaTimes className="text-xl" />
                             </button>
 
                             <div className="text-center mb-12 md:mb-20">
