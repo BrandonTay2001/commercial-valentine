@@ -284,7 +284,11 @@ const Admin = () => {
                                         <div className="mt-4">
                                             <p className="text-[9px] uppercase font-bold text-stone-300 ml-2 mb-2">Preview (Blurred)</p>
                                             <div className="w-full h-40 rounded-3xl overflow-hidden relative">
-                                                <img src={settings.hero_bg_url} className="w-full h-full object-cover blur-lg scale-110" />
+                                                <img
+                                                    src={settings.hero_bg_url}
+                                                    className="w-full h-full object-cover scale-110 transition-all duration-300"
+                                                    style={{ filter: `blur(${settings?.hero_blur_amount || 16}px)` }}
+                                                />
                                                 <div className="absolute inset-0 flex items-center justify-center text-white font-serif italic text-2xl shadow-inner">
                                                     {settings.hero_title}
                                                 </div>

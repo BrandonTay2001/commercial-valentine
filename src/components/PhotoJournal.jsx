@@ -8,7 +8,7 @@ const PhotoCard = ({ photo }) => {
 
     return (
         <div
-            className="relative mb-6 break-inside-avoid cursor-pointer"
+            className="relative mb-3 md:mb-6 break-inside-avoid cursor-pointer"
             style={{ perspective: '1000px' }}
             onClick={() => setIsFlipped(!isFlipped)}
         >
@@ -108,7 +108,7 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
     return (
         <div className={`w-full ${isPage ? '' : 'snap-section'}`}>
             {memories.length > 0 ? (
-                <div className="columns-3 gap-2 md:gap-4 lg:gap-6 w-full pb-20">
+                <div className="columns-2 md:columns-3 gap-3 w-full pb-20 space-y-3">
                     {memories.map(photo => (
                         <PhotoCard key={photo.id} photo={photo} />
                     ))}

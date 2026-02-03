@@ -160,19 +160,25 @@ const Home = () => {
                     />
                 )}
 
-                <div className={`max-w-md text-center px-6 relative z-10 glass-panel p-12 py-16 backdrop-blur-xl border ${isDarkMap ? 'bg-black/10 border-white/10' : 'bg-white/10 border-stone-100'}`}>
-                    <h2 className={`text-4xl font-serif italic mb-6 ${isDarkMap ? 'text-white' : 'text-primary'}`}>To Forever & Beyond</h2>
-                    <p className={`text-sm font-sans mb-12 leading-relaxed tracking-wide ${isDarkMap ? 'text-stone-300' : 'text-stone-400'}`}>
-                        Built with love and shared memories. May our story continue to unfold in the most beautiful ways.
-                    </p>
+                <div className="max-w-md text-center px-6 relative z-10 p-12 py-16">
+                    {/* Glass Background Layer */}
+                    <div className={`absolute inset-0 rounded-[2.5rem] backdrop-blur-xl border ${isDarkMap ? 'bg-black/10 border-white/10' : 'bg-white/10 border-stone-100'}`} />
 
-                    <div className="flex flex-col items-center gap-6">
-                        <div className={`w-12 h-px ${isDarkMap ? 'bg-white/10' : 'bg-stone-200'}`} />
-                        <p className={`text-[10px] uppercase tracking-[0.4em] ${isDarkMap ? 'text-stone-400' : 'text-stone-400'}`}>2026 Valentines</p>
+                    {/* Content Layer */}
+                    <div className="relative z-10">
+                        <h2 className={`text-4xl font-serif italic mb-6 ${isDarkMap ? 'text-white' : 'text-primary'}`}>To Forever & Beyond</h2>
+                        <p className="text-sm font-sans mb-12 leading-relaxed tracking-wide text-white mix-blend-difference">
+                            Built with love and shared memories. May our story continue to unfold in the most beautiful ways.
+                        </p>
 
-                        <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${isDarkMap ? 'border-white/20 text-stone-300 hover:text-white hover:border-white' : 'border-stone-100 text-stone-300 hover:text-primary hover:border-primary'}`}>
-                            Studio Access
-                        </Link>
+                        <div className="flex flex-col items-center gap-6">
+                            <div className={`w-12 h-px ${isDarkMap ? 'bg-white/10' : 'bg-stone-200'}`} />
+                            <p className="text-[10px] uppercase tracking-[0.4em] text-white mix-blend-difference">2026 Valentines</p>
+
+                            <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${isDarkMap ? 'border-white/20 text-stone-300 hover:text-white hover:border-white' : 'border-stone-100 text-white mix-blend-difference hover:border-primary'}`}>
+                                Studio Access
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </footer>

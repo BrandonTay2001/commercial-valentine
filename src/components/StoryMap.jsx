@@ -376,7 +376,7 @@ const StoryMap = ({ mapStylePreset }) => {
                     >
                         <div className="absolute inset-0 bg-stone-50/95 md:bg-stone-50/80 backdrop-blur-2xl" onClick={() => setJournalOpen(false)} />
 
-                        <div className="relative w-full h-full max-w-7xl glass-panel-flat md:glass-panel shadow-2xl overflow-y-auto p-8 md:p-16 custom-scrollbar">
+                        <div className="relative w-full h-full max-w-7xl glass-panel-flat md:glass-panel shadow-2xl overflow-y-auto p-4 md:p-16 custom-scrollbar">
                             <button
                                 onClick={() => setJournalOpen(false)}
                                 className="fixed top-6 right-6 p-4 bg-white shadow-xl rounded-full hover:bg-stone-50 transition-all z-[70] active:scale-95 text-stone-900"
