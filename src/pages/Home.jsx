@@ -142,7 +142,11 @@ const Home = () => {
             </div>
 
             <div id="map" className="snap-section">
-                <StoryMap mapStylePreset={settings?.map_style} />
+                <StoryMap
+                    mapStylePreset={settings?.map_style}
+                    globalZoom={settings?.map_zoom_level}
+                    globalPitch={settings?.map_pitch}
+                />
             </div>
 
             <footer id="footer" className="snap-section relative overflow-hidden min-h-screen flex flex-col items-center justify-center">

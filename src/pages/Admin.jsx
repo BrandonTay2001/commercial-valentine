@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { compressImage } from '../utils/imageCompression';
+import ProtectedRoute from '../components/ProtectedRoute';
 import { useNavigate } from 'react-router-dom';
 import {
     BsArrowLeft, BsMap, BsImages, BsSave, BsPlus,
@@ -16,6 +18,8 @@ const Admin = () => {
     const [loading, setLoading] = useState(true);
     const [selectedCpIndex, setSelectedCpIndex] = useState(0);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [optimizing, setOptimizing] = useState(false);
+    const [optProgress, setOptProgress] = useState({ current: 0, total: 0 });
 
     useEffect(() => {
         fetchData();
@@ -104,6 +108,63 @@ const Admin = () => {
             const { error } = await supabase.from('checkpoints').upsert(payload);
             if (error) console.error('Error saving order:', error);
         }, 1000);
+    };
+
+    const optimizeLibrary = async () => {
+        if (!confirm("This will scan all images, compress massive files (>500KB), and re-upload them. This reduces map lag but may take a few minutes. Continue?")) return;
+
+        setOptimizing(true);
+        try {
+            // 1. Fetch all memories
+            const { data: memories, error } = await supabase.from('memories').select('*');
+            if (error) throw error;
+
+            console.log(`Found ${memories.length} memories to check.`);
+            setOptProgress({ current: 0, total: memories.length });
+
+            let optimizedCount = 0;
+
+            for (let i = 0; i < memories.length; i++) {
+                const mem = memories[i];
+                setOptProgress({ current: i + 1, total: memories.length });
+
+                try {
+                    // 2. Fetch Blob
+                    const response = await fetch(mem.image_url);
+                    const blob = await response.blob();
+
+                    // 3. Check Size (e.g. > 500KB)
+                    if (blob.size > 500 * 1024) {
+                        const file = new File([blob], "temp.jpg", { type: blob.type });
+
+                        // 4. Compress (Max 1600px, 0.8 quality)
+                        const compressedFile = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+
+                        if (compressedFile.size < blob.size) {
+                            // 5. Upload New Version w/ "optimized/" prefix
+                            const newName = `optimized/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+                            const { error: uploadError } = await supabase.storage.from('memories').upload(newName, compressedFile);
+
+                            if (!uploadError) {
+                                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(newName);
+
+                                // 6. Update DB
+                                await supabase.from('memories').update({ image_url: publicUrl }).eq('id', mem.id);
+                                optimizedCount++;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Skipping memory ${mem.id}:`, err);
+                }
+            }
+            alert(`Optimization Complete! Optimized ${optimizedCount} heavy images.`);
+        } catch (err) {
+            console.error(err);
+            alert("Optimization failed. Check console.");
+        } finally {
+            setOptimizing(false);
+        }
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center font-serif italic text-stone-400">Summoning Studio...</div>;
@@ -301,6 +362,53 @@ const Admin = () => {
                                         </div>
                                     </div>
 
+                                    {/* Map Configuration Sliders */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-stone-50 p-6 rounded-3xl border border-stone-100">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Zoom Level (Altitude)</label>
+                                                <span className="text-xs font-mono font-bold text-primary bg-white px-2 py-1 rounded-md border border-stone-100">
+                                                    {settings?.map_zoom_level || 13}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="2"
+                                                max="18"
+                                                step="0.5"
+                                                className="w-full accent-red-400 h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer"
+                                                value={settings?.map_zoom_level || 13}
+                                                onChange={(e) => updateSettings('map_zoom_level', parseFloat(e.target.value))}
+                                            />
+                                            <div className="flex justify-between text-[10px] text-stone-400 font-mono px-1">
+                                                <span>Global (2)</span>
+                                                <span>Street (18)</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">3D Pitch (Tilt)</label>
+                                                <span className="text-xs font-mono font-bold text-primary bg-white px-2 py-1 rounded-md border border-stone-100">
+                                                    {settings?.map_pitch || 0}°
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="60"
+                                                step="5"
+                                                className="w-full accent-red-400 h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer"
+                                                value={settings?.map_pitch || 0}
+                                                onChange={(e) => updateSettings('map_pitch', parseFloat(e.target.value))}
+                                            />
+                                            <div className="flex justify-between text-[10px] text-stone-400 font-mono px-1">
+                                                <span>Flat (0°)</span>
+                                                <span>3D (60°)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Blur Intensity Slider */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
@@ -368,6 +476,37 @@ const Admin = () => {
                                         placeholder="2026 Valentines"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Maintenance Tool */}
+                            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
+                                <h2 className="text-3xl font-serif text-primary mb-6">Maintenance</h2>
+                                <p className="text-sm text-stone-400 mb-6 font-sans">
+                                    Reduce memory usage by optimizing all existing images in your library.
+                                </p>
+
+                                {optimizing ? (
+                                    <div className="space-y-4">
+                                        <div className="h-2 w-full bg-stone-100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-red-400 transition-all duration-300"
+                                                style={{ width: `${(optProgress.current / optProgress.total) * 100}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-xs font-mono text-stone-500">
+                                            <span>Processing...</span>
+                                            <span>{optProgress.current} / {optProgress.total}</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={optimizeLibrary}
+                                        disabled={optimizing}
+                                        className="w-full py-4 bg-stone-50 hover:bg-red-50 text-stone-500 hover:text-red-500 font-bold uppercase tracking-widest text-xs rounded-2xl transition-all border border-stone-100 hover:border-red-100"
+                                    >
+                                        Optimize Image Library
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ) : checkpoints[selectedCpIndex] ? (
@@ -624,6 +763,7 @@ const MemoriesEditor = ({ checkpointId }) => {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [flippedCards, setFlippedCards] = useState({});
     const [draggedId, setDraggedId] = useState(null);
+    const saveTimeoutRef = useRef({});
 
     useEffect(() => {
         fetchMemories();
@@ -653,8 +793,17 @@ const MemoriesEditor = ({ checkpointId }) => {
         const uploadResults = [];
 
         for (const [index, file] of files.entries()) {
-            const name = `${Date.now()}-${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('memories').upload(name, file);
+            // Compress Image before upload
+            let fileToUpload = file;
+            try {
+                // Resize to max 1600px width, 0.8 quality
+                fileToUpload = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+            } catch (err) {
+                console.warn("Compression failed, using original file", err);
+            }
+
+            const name = `optimized/${Date.now()}-${fileToUpload.name}`;
+            const { error: uploadError } = await supabase.storage.from('memories').upload(name, fileToUpload);
 
             if (!uploadError) {
                 const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(name);
@@ -686,11 +835,22 @@ const MemoriesEditor = ({ checkpointId }) => {
         setUploadProgress(0);
     };
 
-    const update = async (id, field, value) => {
-        await supabase.from('memories').update({ [field]: value }).eq('id', id);
-        const next = memories.map(m => m.id === id ? { ...m, [field]: value } : m);
-        setMemories(next);
+    const update = (id, field, value) => {
+        // 1. Optimistic Update (Instant feedback)
+        setMemories(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
+
+        // 2. Debounced Save
+        if (saveTimeoutRef.current[`${id}-${field}`]) {
+            clearTimeout(saveTimeoutRef.current[`${id}-${field}`]);
+        }
+
+        saveTimeoutRef.current[`${id}-${field}`] = setTimeout(async () => {
+            await supabase.from('memories').update({ [field]: value }).eq('id', id);
+            delete saveTimeoutRef.current[`${id}-${field}`];
+        }, 1000); // Wait 1 second after last keystroke
     };
+
+
 
     const remove = async (id) => {
         if (window.confirm('Remove this memory forever?')) {
@@ -730,7 +890,6 @@ const MemoriesEditor = ({ checkpointId }) => {
         const newMemories = [...memories];
         const [removed] = newMemories.splice(draggedIndex, 1);
         newMemories.splice(targetIndex, 0, removed);
-
         setMemories(newMemories);
     };
 
@@ -746,6 +905,61 @@ const MemoriesEditor = ({ checkpointId }) => {
 
         for (const { id, order_index } of updates) {
             await supabase.from('memories').update({ order_index }).eq('id', id);
+        }
+    };
+
+    const optimizeLibrary = async () => {
+        if (!confirm("This will scan all images, compress massive files (>1000KB), and re-upload them. This reduces map lag but may take a few minutes. Continue?")) return;
+
+        setOptimizing(true);
+        try {
+            // 1. Fetch all memories
+            const { data: memories, error } = await supabase.from('memories').select('*');
+            if (error) throw error;
+
+            setOptProgress({ current: 0, total: memories.length });
+            let optimizedCount = 0;
+
+            for (let i = 0; i < memories.length; i++) {
+                const mem = memories[i];
+                setOptProgress({ current: i + 1, total: memories.length });
+
+                try {
+                    // 2. Fetch Blob
+                    const response = await fetch(mem.image_url);
+                    const blob = await response.blob();
+
+                    // 3. Check Size (e.g. > 1000KB)
+                    if (blob.size > 1000 * 1024) {
+                        const file = new File([blob], "temp.jpg", { type: blob.type });
+
+                        // 4. Compress (Max 1600px, 0.8 quality)
+                        const compressedFile = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+
+                        if (compressedFile.size < blob.size) {
+                            // 5. Upload New Version
+                            const newName = `optimized/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+                            const { error: uploadError } = await supabase.storage.from('memories').upload(newName, compressedFile);
+
+                            if (!uploadError) {
+                                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(newName);
+
+                                // 6. Update DB
+                                await supabase.from('memories').update({ image_url: publicUrl }).eq('id', mem.id);
+                                optimizedCount++;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Skipping memory ${mem.id}:`, err);
+                }
+            }
+            alert(`Optimization Complete! optimized ${optimizedCount} heavy images.`);
+        } catch (err) {
+            console.error(err);
+            alert("Optimization process encountered an error.");
+        } finally {
+            setOptimizing(false);
         }
     };
 

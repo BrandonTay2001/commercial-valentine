@@ -13,28 +13,43 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
     const [images, setImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-    // Only fetch memories when shouldLoadImages is true (active or nearby)
+    // Optimized image fetching:
+    // - Distant markers (shouldLoadImages=false): Fetch only 1 image for preview
+    // - Nearby markers (shouldLoadImages=true): Fetch up to 5 images for rotation
     useEffect(() => {
-        if (!shouldLoadImages || !checkpoint.id) {
-            // Clear images when not in view range to free memory
-            if (!shouldLoadImages && images.length > 0) {
-                setImages([]);
-                setCurrentImageIndex(0);
-            }
-            return;
-        }
+        let isMounted = true;
 
         const fetchImages = async () => {
+            // If we are distant and already have images, just limit to 1 (save memory)
+            if (!shouldLoadImages && images.length > 0) {
+                if (images.length > 1) setImages(prev => prev.slice(0, 1));
+                return;
+            }
+
+            // If we are nearby and already have 5, no need to fetch
+            if (shouldLoadImages && images.length >= 5) return;
+
+            const limit = shouldLoadImages ? 5 : 1;
+
             const { data } = await supabase
                 .from('memories')
                 .select('image_url')
                 .eq('checkpoint_id', checkpoint.id)
                 .order('order_index', { ascending: true })
-                .limit(5);
-            if (data) setImages(data.map(m => m.image_url));
+                .limit(limit);
+
+            if (isMounted && data) {
+                // Optimization: Only update if we have more data or no data
+                if (data.length > images.length || images.length === 0) {
+                    setImages(data.map(m => m.image_url));
+                }
+            }
         };
-        fetchImages();
-    }, [checkpoint.id, shouldLoadImages]);
+
+        if (checkpoint.id) fetchImages();
+
+        return () => { isMounted = false; };
+    }, [checkpoint.id, shouldLoadImages]); // Re-run when proximity changes
 
     // Rotate images every 3 seconds (only when active)
     useEffect(() => {
@@ -58,6 +73,7 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
         <motion.div
             onClick={handleClick}
             className="cursor-pointer relative"
+            style={{ zIndex: isActive ? 50 : 1 }} // Ensure active marker is always on top
             animate={{
                 scale: isActive ? 1 : 0.75,
                 opacity: isActive ? 1 : 0.7
@@ -144,7 +160,7 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
     );
 };
 
-const StoryMap = ({ mapStylePreset }) => {
+const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
     const mapRef = useRef(null);
     const [checkpoints, setCheckpoints] = useState([]);
     const [activeCheckpoint, setActiveCheckpoint] = useState(0);
@@ -153,12 +169,13 @@ const StoryMap = ({ mapStylePreset }) => {
     const [viewState, setViewState] = useState({
         latitude: 0,
         longitude: 0,
-        zoom: 2
+        zoom: globalZoom,
+        pitch: globalPitch
     });
 
     useEffect(() => {
         fetchCheckpoints();
-    }, []);
+    }, [globalZoom, globalPitch]); // Re-fetch/re-center if globals change significantly? actually maybe just re-apply viewstate is enough but fetching is fine for now
 
     const fetchCheckpoints = async () => {
         const { data, error } = await supabase
@@ -168,11 +185,13 @@ const StoryMap = ({ mapStylePreset }) => {
 
         if (!error && data && data.length > 0) {
             setCheckpoints(data);
-            setViewState({
+            setViewState(prev => ({
+                ...prev,
                 latitude: data[0].latitude,
                 longitude: data[0].longitude,
-                zoom: data[0].zoom || 13
-            });
+                zoom: globalZoom || data[0].zoom || 13,
+                pitch: globalPitch
+            }));
         }
         setLoading(false);
     };
@@ -191,10 +210,11 @@ const StoryMap = ({ mapStylePreset }) => {
         const map = mapRef.current.getMap();
         map.flyTo({
             center: [target.longitude, target.latitude],
-            zoom: target.zoom || 13,
-            speed: 1.5,
+            zoom: globalZoom || target.zoom || 13,
+            pitch: globalPitch, // Apply global pitch
+            speed: 0.9,
             curve: 1.5,
-            easing: (t) => t,
+            easing: (t) => 1 - Math.pow(1 - t, 3),
             essential: true
         });
     };
@@ -279,6 +299,7 @@ const StoryMap = ({ mapStylePreset }) => {
                             longitude={site.longitude}
                             latitude={site.latitude}
                             anchor="bottom"
+                            style={{ zIndex: activeCheckpoint === index ? 100 : 'auto' }}
                         >
                             <LocationMarker
                                 checkpoint={site}
@@ -295,9 +316,9 @@ const StoryMap = ({ mapStylePreset }) => {
                 <div className={`absolute inset-0 pointer-events-none bg-gradient-to-b ${theme.gradientMobile} via-transparent ${theme.gradientMobile} md:hidden block`} />
             </div>
 
-            {/* Wheel Scroller UI */}
+            {/* Wheel Scroller UI - Compact Mobile Design */}
             <div
-                className="absolute left-0 md:left-20 bottom-20 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[300px] md:h-[450px] overflow-hidden select-none"
+                className="absolute left-0 md:left-20 bottom-12 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none"
                 onWheel={(e) => {
                     // Debounce wheel events
                     if (Math.abs(e.deltaY) > 20) {
@@ -318,6 +339,9 @@ const StoryMap = ({ mapStylePreset }) => {
                 {/* Visual Midline */}
                 <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
 
+                {/* Mobile Active Indicator (Subtle pill) */}
+                <div className="absolute top-1/2 left-6 md:hidden w-1 h-12 -translate-y-1/2 bg-red-400/50 rounded-full z-0"></div>
+
                 {/* The List - Apple-style picker with momentum */}
                 <motion.div
                     className="absolute top-1/2 left-0 w-full z-40 cursor-grab active:cursor-grabbing"
@@ -330,7 +354,7 @@ const StoryMap = ({ mapStylePreset }) => {
                     }}
                     drag="y"
                     dragConstraints={{ top: -((checkpoints.length - 1) * ITEM_HEIGHT), bottom: 0 }}
-                    dragElastic={0.05}
+                    dragElastic={0.1}
                     onDragEnd={handleDragEnd}
                 >
                     {checkpoints.map((point, idx) => {
@@ -340,9 +364,11 @@ const StoryMap = ({ mapStylePreset }) => {
                                 key={point.id}
                                 className={`h-[150px] flex flex-col justify-center px-10 md:pl-8 md:pr-0 border-l-4 md:border-l-2 transition-all ${isActive ? 'border-red-400 opacity-100' : `${theme.border} opacity-20`}`}
                                 animate={{
-                                    scale: isActive ? 1.05 : 0.9,
-                                    x: isActive ? (window.innerWidth < 768 ? 20 : 10) : 0,
-                                    opacity: isActive ? 1 : 0.3
+                                    scale: isActive ? 1.05 : 0.85,
+                                    x: isActive ? (window.innerWidth < 768 ? 10 : 10) : 0,
+                                    y: isActive && window.innerWidth < 768 ? -60 : 0, // Shift active item up on mobile
+                                    opacity: isActive ? 1 : (isDarkStyle ? 0.3 : 0.4),
+                                    filter: isActive ? 'blur(0px)' : 'blur(1px)' // Blur distant items for depth
                                 }}
                             >
                                 <h4 className={`font-serif text-3xl md:text-3xl lg:text-4xl leading-tight ${isActive ? theme.textPrimary : theme.textMuted}`}>
@@ -365,9 +391,9 @@ const StoryMap = ({ mapStylePreset }) => {
                     })}
                 </motion.div>
 
-                {/* Fade Masks */}
-                <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
-                <div className={`absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
+                {/* Fade Masks - Adjusted for mobile compactness */}
+                <div className={`absolute top-0 left-0 w-full h-20 md:h-32 bg-gradient-to-b ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
+                <div className={`absolute bottom-0 left-0 w-full h-20 md:h-32 bg-gradient-to-t ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />
             </div>
 
             {/* Desktop Description Panel (Right) */}
