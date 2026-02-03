@@ -9,12 +9,21 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const ITEM_HEIGHT = 150;
 
 // Custom Location Marker with rotating image preview
-const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark }) => {
+const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, shouldLoadImages = false }) => {
     const [images, setImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-    // Fetch memories for this checkpoint
+    // Only fetch memories when shouldLoadImages is true (active or nearby)
     useEffect(() => {
+        if (!shouldLoadImages || !checkpoint.id) {
+            // Clear images when not in view range to free memory
+            if (!shouldLoadImages && images.length > 0) {
+                setImages([]);
+                setCurrentImageIndex(0);
+            }
+            return;
+        }
+
         const fetchImages = async () => {
             const { data } = await supabase
                 .from('memories')
@@ -24,17 +33,17 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark }
                 .limit(5);
             if (data) setImages(data.map(m => m.image_url));
         };
-        if (checkpoint.id) fetchImages();
-    }, [checkpoint.id]);
+        fetchImages();
+    }, [checkpoint.id, shouldLoadImages]);
 
-    // Rotate images every 3 seconds
+    // Rotate images every 3 seconds (only when active)
     useEffect(() => {
-        if (images.length <= 1) return;
+        if (!isActive || images.length <= 1) return;
         const interval = setInterval(() => {
             setCurrentImageIndex(prev => (prev + 1) % images.length);
         }, 3000);
         return () => clearInterval(interval);
-    }, [images.length]);
+    }, [images.length, isActive]);
 
     // Handle click: if active, open journal; otherwise navigate to this marker
     const handleClick = () => {
@@ -80,6 +89,7 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark }
                                 key={currentImageIndex}
                                 src={images[currentImageIndex]}
                                 alt=""
+                                loading="lazy"
                                 className="absolute inset-0 w-full h-full object-cover"
                                 initial={{ opacity: 0, scale: 1.1 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -189,13 +199,11 @@ const StoryMap = ({ mapStylePreset }) => {
         });
     };
 
-    // "Remote Control" Drag Logic
-    // Instead of dragging the list, we drag an invisible proxy that updates the state
+    // Apple-style momentum scrolling - calculates how many items to skip based on velocity
     const handleDragEnd = (_, info) => {
         const { offset, velocity } = info;
-        const swipeThreshold = 50;
 
-        // Hand-off Logic (Explicit)
+        // Hand-off Logic for section navigation
         if (activeCheckpoint === 0 && offset.y > 100) {
             document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' });
             return;
@@ -205,16 +213,26 @@ const StoryMap = ({ mapStylePreset }) => {
             return;
         }
 
-        // Logic: Swipe Down (Positive Y) -> Previous Item
-        // Logic: Swipe Up (Negative Y) -> Next Item
-        if (offset.y > swipeThreshold || velocity.y > 300) {
-            if (activeCheckpoint > 0) {
-                flyToLocation(activeCheckpoint - 1);
-            }
-        } else if (offset.y < -swipeThreshold || velocity.y < -300) {
-            if (activeCheckpoint < checkpoints.length - 1) {
-                flyToLocation(activeCheckpoint + 1);
-            }
+        // Calculate items to skip based on velocity (iOS picker momentum feel)
+        // Higher velocity = more items skipped
+        const velocityThreshold = 200;
+        const maxSkip = 3; // Maximum items to skip at once
+
+        let itemsToSkip = 0;
+
+        if (Math.abs(velocity.y) > velocityThreshold) {
+            // Velocity-based: faster swipe = skip more items
+            itemsToSkip = Math.min(maxSkip, Math.floor(Math.abs(velocity.y) / 400));
+            itemsToSkip = Math.max(1, itemsToSkip);
+        } else if (Math.abs(offset.y) > 40) {
+            // Offset-based: small drag = move 1 item
+            itemsToSkip = 1;
+        }
+
+        if (itemsToSkip > 0) {
+            const direction = (offset.y > 0 || velocity.y > velocityThreshold) ? -1 : 1;
+            const targetIndex = Math.max(0, Math.min(checkpoints.length - 1, activeCheckpoint + (direction * itemsToSkip)));
+            flyToLocation(targetIndex);
         }
     };
 
@@ -268,6 +286,7 @@ const StoryMap = ({ mapStylePreset }) => {
                                 onClick={() => flyToLocation(index)}
                                 onOpenJournal={() => setJournalOpen(true)}
                                 isDark={isDarkStyle}
+                                shouldLoadImages={Math.abs(activeCheckpoint - index) <= 1}
                             />
                         </Marker>
                     ))}
@@ -278,7 +297,7 @@ const StoryMap = ({ mapStylePreset }) => {
 
             {/* Wheel Scroller UI */}
             <div
-                className="absolute left-0 md:left-20 top-1/2 -translate-y-1/2 z-20 w-full md:w-80 h-[450px] overflow-hidden select-none touch-none"
+                className="absolute left-0 md:left-20 bottom-20 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[300px] md:h-[450px] overflow-hidden select-none"
                 onWheel={(e) => {
                     // Debounce wheel events
                     if (Math.abs(e.deltaY) > 20) {
@@ -299,15 +318,19 @@ const StoryMap = ({ mapStylePreset }) => {
                 {/* Visual Midline */}
                 <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
 
-                {/* The List (Direct Drag Enabled) */}
+                {/* The List - Apple-style picker with momentum */}
                 <motion.div
                     className="absolute top-1/2 left-0 w-full z-40 cursor-grab active:cursor-grabbing"
                     initial={false}
                     animate={{ y: -activeCheckpoint * ITEM_HEIGHT }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    transition={{
+                        type: "tween",
+                        duration: 0.4,
+                        ease: [0.32, 0.72, 0, 1] // iOS-style easing curve
+                    }}
                     drag="y"
                     dragConstraints={{ top: -((checkpoints.length - 1) * ITEM_HEIGHT), bottom: 0 }}
-                    dragElastic={0.2}
+                    dragElastic={0.05}
                     onDragEnd={handleDragEnd}
                 >
                     {checkpoints.map((point, idx) => {
