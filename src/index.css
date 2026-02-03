@@ -10,6 +10,22 @@
   body {
     @apply bg-stone-50 text-secondary antialiased overflow-hidden m-0 p-0 w-full h-full;
   }
+
+  @keyframes blink {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .animate-blink {
+    animation: blink 1s step-end infinite;
+  }
 }
 
 @layer components {
@@ -62,12 +78,15 @@
     border-radius: 20px;
   }
 }
+
 /* 3D Transform utilities for flip cards */
 .perspective-1000 {
+  -webkit-perspective: 1000px;
   perspective: 1000px;
 }
 
 .preserve-3d {
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
 }
 

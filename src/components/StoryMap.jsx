@@ -22,7 +22,10 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
         const fetchImages = async () => {
             // If we are distant and already have images, just limit to 1 (save memory)
             if (!shouldLoadImages && images.length > 0) {
-                if (images.length > 1) setImages(prev => prev.slice(0, 1));
+                if (images.length > 1) {
+                    setImages(prev => prev.slice(0, 1));
+                    setCurrentImageIndex(0);
+                }
                 return;
             }
 
@@ -103,7 +106,7 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
                         {images.length > 0 ? (
                             <motion.img
                                 key={currentImageIndex}
-                                src={images[currentImageIndex]}
+                                src={images[currentImageIndex] || images[0]}
                                 alt=""
                                 loading="lazy"
                                 className="absolute inset-0 w-full h-full object-cover"
@@ -318,7 +321,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
 
             {/* Wheel Scroller UI - Compact Mobile Design */}
             <div
-                className="absolute left-0 md:left-20 bottom-12 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none"
+                className="absolute left-0 md:left-20 bottom-32 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none"
                 onWheel={(e) => {
                     // Debounce wheel events
                     if (Math.abs(e.deltaY) > 20) {
