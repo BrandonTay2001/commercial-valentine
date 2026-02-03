@@ -8,6 +8,123 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 const ITEM_HEIGHT = 120;
 
+// Custom Location Marker with rotating image preview
+const LocationMarker = ({ checkpoint, isActive, onClick, isDark }) => {
+    const [images, setImages] = useState([]);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    // Fetch memories for this checkpoint
+    useEffect(() => {
+        const fetchImages = async () => {
+            const { data } = await supabase
+                .from('memories')
+                .select('image_url')
+                .eq('checkpoint_id', checkpoint.id)
+                .order('order_index', { ascending: true })
+                .limit(5);
+            if (data) setImages(data.map(m => m.image_url));
+        };
+        if (checkpoint.id) fetchImages();
+    }, [checkpoint.id]);
+
+    // Rotate images every 3 seconds
+    useEffect(() => {
+        if (images.length <= 1) return;
+        const interval = setInterval(() => {
+            setCurrentImageIndex(prev => (prev + 1) % images.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [images.length]);
+
+    return (
+        <motion.div
+            onClick={onClick}
+            className="cursor-pointer relative"
+            animate={{
+                scale: isActive ? 1 : 0.75,
+                opacity: isActive ? 1 : 0.7
+            }}
+            whileHover={{ scale: isActive ? 1.05 : 0.85 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        >
+            {/* Glassmorphic Popup Box */}
+            <div
+                className={`relative rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl border ${isActive
+                    ? 'border-white/40 bg-white/20'
+                    : isDark
+                        ? 'border-white/10 bg-black/30'
+                        : 'border-white/30 bg-white/40'
+                    }`}
+                style={{
+                    width: isActive ? '150px' : '90px',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: isActive
+                        ? '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.1) inset'
+                        : '0 10px 40px -10px rgba(0, 0, 0, 0.15)'
+                }}
+            >
+                {/* Image Preview */}
+                <div className="relative aspect-[4/3] overflow-hidden">
+                    <AnimatePresence mode="wait">
+                        {images.length > 0 ? (
+                            <motion.img
+                                key={currentImageIndex}
+                                src={images[currentImageIndex]}
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover"
+                                initial={{ opacity: 0, scale: 1.1 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.6 }}
+                            />
+                        ) : (
+                            <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-gradient-to-br from-stone-800 to-stone-900' : 'bg-gradient-to-br from-stone-100 to-stone-200'
+                                }`}>
+                                <FaHeart className={`text-xl ${isActive ? 'text-red-400' : isDark ? 'text-stone-600' : 'text-stone-300'}`} />
+                            </div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+                    {/* Image indicator dots */}
+                    {images.length > 1 && isActive && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                            {images.map((_, i) => (
+                                <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all shadow-sm ${i === currentImageIndex ? 'bg-white scale-110' : 'bg-white/50'
+                                    }`} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Label */}
+                <div className={`px-3 py-2 text-center backdrop-blur-md border-t ${isDark ? 'bg-black/60 border-white/5' : 'bg-white/80 border-white/40'
+                    }`}>
+                    <span className={`font-serif italic text-xs tracking-wide truncate block ${isActive
+                            ? isDark ? 'text-red-200' : 'text-red-900'
+                            : isDark ? 'text-stone-300' : 'text-stone-600'
+                        }`}>
+                        {checkpoint.marker_label || checkpoint.title}
+                    </span>
+                </div>
+            </div>
+
+            {/* Glassmorphic Pointer */}
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-2.5 z-10">
+                <div className={`w-0 h-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent drop-shadow-lg ${isActive ? 'border-t-white/60' : (isDark ? 'border-t-black/40' : 'border-t-white/70')
+                    }`} />
+            </div>
+
+            {/* Glow effect for active */}
+            {isActive && (
+                <div className="absolute -inset-3 bg-red-400/20 rounded-3xl blur-xl -z-10" />
+            )}
+        </motion.div>
+    );
+};
+
 const StoryMap = ({ mapStylePreset }) => {
     const mapRef = useRef(null);
     const [checkpoints, setCheckpoints] = useState([]);
@@ -136,12 +253,12 @@ const StoryMap = ({ mapStylePreset }) => {
                             latitude={site.latitude}
                             anchor="bottom"
                         >
-                            <div
+                            <LocationMarker
+                                checkpoint={site}
+                                isActive={activeCheckpoint === index}
                                 onClick={() => flyToLocation(index)}
-                                className={`text-3xl cursor-pointer transition-transform duration-500 ${activeCheckpoint === index ? 'scale-125 text-red-500' : `scale-100 ${theme.markerInactive} opacity-60`}`}
-                            >
-                                <FaHeart className="drop-shadow-lg" />
-                            </div>
+                                isDark={isDarkStyle}
+                            />
                         </Marker>
                     ))}
                 </Map>
@@ -156,7 +273,7 @@ const StoryMap = ({ mapStylePreset }) => {
 
                 {/* The List (Controlled by State, Not Drag) */}
                 <motion.div
-                    className="absolute top-1/2 left-0 w-full"
+                    className="absolute top-1/2 left-0 w-full z-40"
                     initial={false}
                     animate={{ y: -activeCheckpoint * ITEM_HEIGHT }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}

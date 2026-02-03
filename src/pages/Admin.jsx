@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     BsArrowLeft, BsMap, BsImages, BsSave, BsPlus,
     BsTrash, BsShieldLock, BsUpload, BsMenuButtonWide,
-    BsX, BsGearWideConnected
+    BsX, BsGearWideConnected, BsGeoAlt, BsSearch
 } from 'react-icons/bs';
 import { supabase } from '../lib/supabase';
 
@@ -54,15 +54,40 @@ const Admin = () => {
         setBgUploading(false);
     };
 
-    const saveAll = async () => {
-        // Save locations
-        const { error: cpError } = await supabase.from('checkpoints').upsert(checkpoints.map((cp, i) => ({ ...cp, order_index: i })));
+    // Auto-save checkpoint (debounced)
+    const saveCheckpointRef = React.useRef(null);
+    const autoSaveCheckpoint = (checkpoint) => {
+        if (saveCheckpointRef.current) clearTimeout(saveCheckpointRef.current);
+        saveCheckpointRef.current = setTimeout(async () => {
+            if (!checkpoint.id) return; // Can't save unsaved checkpoint
+            // Exclude address field if it exists (not in DB schema)
+            const { address, ...cpToSave } = checkpoint;
+            await supabase.from('checkpoints').upsert(cpToSave);
+        }, 500);
+    };
 
-        // Save settings
-        const { error: settingsError } = await supabase.from('site_settings').update(settings).eq('id', 1);
+    // Auto-save settings (debounced)
+    const saveSettingsRef = React.useRef(null);
+    const autoSaveSettings = (newSettings) => {
+        if (saveSettingsRef.current) clearTimeout(saveSettingsRef.current);
+        saveSettingsRef.current = setTimeout(async () => {
+            await supabase.from('site_settings').update(newSettings).eq('id', 1);
+        }, 500);
+    };
 
-        if (!cpError && !settingsError) alert('Everything saved successfully! ❤️');
-        else alert('Error saving data. Check console.');
+    // Helper to update checkpoint and trigger auto-save
+    const updateCheckpoint = (index, field, value) => {
+        const next = [...checkpoints];
+        next[index] = { ...next[index], [field]: value };
+        setCheckpoints(next);
+        autoSaveCheckpoint(next[index]);
+    };
+
+    // Helper to update settings and trigger auto-save  
+    const updateSettings = (field, value) => {
+        const newSettings = { ...settings, [field]: value };
+        setSettings(newSettings);
+        autoSaveSettings(newSettings);
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center font-serif italic text-stone-400">Summoning Studio...</div>;
@@ -83,7 +108,7 @@ const Admin = () => {
                         <h1 className="font-serif italic text-lg leading-tight">Studio</h1>
                     </div>
                 </div>
-                <button onClick={saveAll} className="bg-primary text-white p-2 rounded-lg shadow-sm"><BsSave /></button>
+                <div className="text-[9px] uppercase tracking-widest text-stone-300 font-bold">Auto-saves</div>
             </div>
 
             {/* Sidebar */}
@@ -148,9 +173,9 @@ const Admin = () => {
                         </div>
 
                         <div className="p-6 border-t border-stone-100 bg-white">
-                            <button onClick={saveAll} className="w-full bg-stone-900 text-white rounded-[1.5rem] py-4 flex items-center justify-center gap-3 hover:bg-black shadow-lg hover:shadow-xl transition-all font-bold text-sm">
-                                <BsSave className="text-red-400" /> Save Everything
-                            </button>
+                            <div className="text-center text-xs text-stone-300 font-medium py-2">
+                                ✓ Auto-saves as you type
+                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -175,8 +200,8 @@ const Admin = () => {
 
                                 <div className="space-y-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <Field label="Landing Label" value={settings?.hero_label} onChange={(v) => setSettings({ ...settings, hero_label: v })} />
-                                        <Field label="Landing Title" value={settings?.hero_title} onChange={(v) => setSettings({ ...settings, hero_title: v })} />
+                                        <Field label="Landing Label" value={settings?.hero_label} onChange={(v) => updateSettings('hero_label', v)} />
+                                        <Field label="Landing Title" value={settings?.hero_title} onChange={(v) => updateSettings('hero_title', v)} />
                                     </div>
 
                                     <div className="space-y-2">
@@ -184,7 +209,7 @@ const Admin = () => {
                                         <textarea
                                             className="w-full bg-stone-50 border border-stone-100 rounded-[2rem] px-6 py-5 outline-none h-32 resize-none focus:bg-white focus:border-red-100 transition-all"
                                             value={settings?.hero_subtext}
-                                            onChange={(e) => setSettings({ ...settings, hero_subtext: e.target.value })}
+                                            onChange={(e) => updateSettings('hero_subtext', e.target.value)}
                                         />
                                     </div>
 
@@ -267,27 +292,31 @@ const Admin = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                                    <Field label="Location Name" value={checkpoints[selectedCpIndex].title} onChange={(v) => {
-                                        const next = [...checkpoints]; next[selectedCpIndex].title = v; setCheckpoints(next);
-                                    }} />
-                                    <Field label="Special Date" value={checkpoints[selectedCpIndex].date} onChange={(v) => {
-                                        const next = [...checkpoints]; next[selectedCpIndex].date = v; setCheckpoints(next);
-                                    }} />
-                                    <Field label="Latitude" type="number" value={checkpoints[selectedCpIndex].latitude} onChange={(v) => {
-                                        const next = [...checkpoints]; next[selectedCpIndex].latitude = parseFloat(v); setCheckpoints(next);
-                                    }} />
-                                    <Field label="Longitude" type="number" value={checkpoints[selectedCpIndex].longitude} onChange={(v) => {
-                                        const next = [...checkpoints]; next[selectedCpIndex].longitude = parseFloat(v); setCheckpoints(next);
-                                    }} />
+                                    <Field label="Location Name" value={checkpoints[selectedCpIndex].title} onChange={(v) => updateCheckpoint(selectedCpIndex, 'title', v)} />
+                                    <Field label="Map Marker Label" value={checkpoints[selectedCpIndex].marker_label || ''} onChange={(v) => updateCheckpoint(selectedCpIndex, 'marker_label', v)} placeholder="Short name for map pin" />
+                                    <Field label="Special Date" value={checkpoints[selectedCpIndex].date} onChange={(v) => updateCheckpoint(selectedCpIndex, 'date', v)} />
+                                    <div className="col-span-1 md:col-span-2">
+                                        <AddressSearch
+                                            latitude={checkpoints[selectedCpIndex].latitude}
+                                            longitude={checkpoints[selectedCpIndex].longitude}
+                                            address={checkpoints[selectedCpIndex].address || ''}
+                                            onSelect={(lat, lng, addr) => {
+                                                const next = [...checkpoints];
+                                                next[selectedCpIndex].latitude = lat;
+                                                next[selectedCpIndex].longitude = lng;
+                                                next[selectedCpIndex].address = addr;
+                                                setCheckpoints(next);
+                                                autoSaveCheckpoint(next[selectedCpIndex]);
+                                            }}
+                                        />
+                                    </div>
                                     <div className="col-span-1 md:col-span-2 space-y-2">
                                         <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Story Fragment</label>
                                         <textarea
                                             className="w-full bg-stone-50 border border-stone-100 rounded-[2rem] px-6 py-5 outline-none h-40 resize-none focus:bg-white focus:border-red-100 transition-all"
                                             placeholder="Write about what happened here..."
                                             value={checkpoints[selectedCpIndex].description}
-                                            onChange={(e) => {
-                                                const next = [...checkpoints]; next[selectedCpIndex].description = e.target.value; setCheckpoints(next);
-                                            }}
+                                            onChange={(e) => updateCheckpoint(selectedCpIndex, 'description', e.target.value)}
                                         />
                                     </div>
                                 </div>
@@ -334,10 +363,160 @@ const Field = ({ label, value, onChange, type = "text" }) => (
     </div>
 );
 
+const AddressSearch = ({ latitude, longitude, address, onSelect }) => {
+    const [query, setQuery] = useState(address || '');
+    const [suggestions, setSuggestions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const debounceRef = React.useRef(null);
+
+    // Sync query when address prop changes (switching checkpoints)
+    useEffect(() => {
+        setQuery(address || '');
+    }, [address]);
+
+    const searchAddress = async (text) => {
+        if (!text || text.length < 3) {
+            setSuggestions([]);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const apiKey = import.meta.env.VITE_GOOGLE_PLACES_KEY;
+            // Use Google Places Autocomplete API
+            const response = await fetch(
+                `https://places.googleapis.com/v1/places:autocomplete`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey
+                    },
+                    body: JSON.stringify({
+                        input: text,
+                        includedPrimaryTypes: ['street_address', 'subpremise', 'premise', 'establishment', 'geocode']
+                    })
+                }
+            );
+            const data = await response.json();
+            if (data.suggestions) {
+                setSuggestions(data.suggestions.map(s => ({
+                    place_id: s.placePrediction?.placeId,
+                    name: s.placePrediction?.structuredFormat?.mainText?.text || '',
+                    full_address: s.placePrediction?.text?.text || s.placePrediction?.structuredFormat?.secondaryText?.text || ''
+                })).filter(s => s.place_id));
+            }
+        } catch (err) {
+            console.error('Search error:', err);
+        }
+        setLoading(false);
+    };
+
+    const handleInputChange = (e) => {
+        const val = e.target.value;
+        setQuery(val);
+        setShowDropdown(true);
+
+        // Debounce API calls
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => searchAddress(val), 300);
+    };
+
+    const handleSelect = async (suggestion) => {
+        setQuery(suggestion.full_address);
+        setSuggestions([]);
+        setShowDropdown(false);
+
+        // Get place details to retrieve coordinates
+        try {
+            const apiKey = import.meta.env.VITE_GOOGLE_PLACES_KEY;
+            const response = await fetch(
+                `https://places.googleapis.com/v1/places/${suggestion.place_id}?fields=location`,
+                {
+                    headers: {
+                        'X-Goog-Api-Key': apiKey
+                    }
+                }
+            );
+            const data = await response.json();
+            if (data.location) {
+                onSelect(data.location.latitude, data.location.longitude, suggestion.full_address);
+            }
+        } catch (err) {
+            console.error('Place details error:', err);
+        }
+    };
+
+    const hasCoords = latitude && longitude && (latitude !== 0 || longitude !== 0);
+
+    return (
+        <div className="space-y-2">
+            <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Location</label>
+            <div className="relative">
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-stone-300">
+                    <BsSearch />
+                </div>
+                <input
+                    type="text"
+                    className="w-full bg-stone-50 border border-stone-100 rounded-2xl pl-12 pr-6 py-3.5 outline-none focus:bg-white focus:border-red-100 transition-all font-medium text-primary shadow-sm"
+                    value={query}
+                    onChange={handleInputChange}
+                    onFocus={() => setShowDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                    placeholder="Search for an address or city..."
+                />
+                {loading && (
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-stone-200 border-t-red-400 rounded-full animate-spin" />
+                    </div>
+                )}
+            </div>
+
+            {/* Suggestions Dropdown */}
+            <AnimatePresence>
+                {showDropdown && suggestions.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden max-h-60 overflow-y-auto"
+                    >
+                        {suggestions.map(s => (
+                            <button
+                                key={s.place_id}
+                                onClick={() => handleSelect(s)}
+                                className="w-full text-left px-5 py-3.5 hover:bg-stone-50 transition-colors flex items-start gap-3 border-b border-stone-50 last:border-0"
+                            >
+                                <BsGeoAlt className="text-red-400 mt-0.5 flex-shrink-0" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-primary">{s.name}</span>
+                                    <span className="text-xs text-stone-400">{s.full_address}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Coordinates Preview */}
+            {hasCoords && (
+                <div className="flex items-center gap-2 text-xs text-stone-400 ml-2 mt-2">
+                    <BsGeoAlt className="text-red-300" />
+                    <span>Lat: {latitude?.toFixed(4)}, Lng: {longitude?.toFixed(4)}</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const MemoriesEditor = ({ checkpointId }) => {
     const [memories, setMemories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [flippedCards, setFlippedCards] = useState({});
+    const [draggedId, setDraggedId] = useState(null);
 
     useEffect(() => {
         fetchMemories();
@@ -351,21 +530,53 @@ const MemoriesEditor = ({ checkpointId }) => {
     };
 
     const upload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setUploading(true);
-        const name = `${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage.from('memories').upload(name, file);
-        if (error) {
-            alert('Upload error. ensure bucket "memories" exists and is public.');
-            setUploading(false);
+        if (!checkpointId) {
+            alert("Please save this location first before adding photos!");
+            e.target.value = null;
             return;
         }
-        const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(name);
 
-        await supabase.from('memories').insert({ checkpoint_id: checkpointId, image_url: publicUrl, order_index: memories.length });
-        fetchMemories();
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        setUploading(true);
+        setUploadProgress(0);
+
+        let completed = 0;
+        const uploadResults = [];
+
+        for (const [index, file] of files.entries()) {
+            const name = `${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('memories').upload(name, file);
+
+            if (!uploadError) {
+                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(name);
+                uploadResults.push({
+                    checkpoint_id: checkpointId,
+                    image_url: publicUrl,
+                    order_index: memories.length + index
+                });
+            } else {
+                console.error("Storage upload error:", uploadError);
+            }
+            completed++;
+            setUploadProgress(Math.round((completed / files.length) * 100));
+        }
+
+        if (uploadResults.length > 0) {
+            const { error: insertError } = await supabase.from('memories').insert(uploadResults).select();
+            if (insertError) {
+                alert(`DB Error: ${insertError.message}`);
+            } else {
+                await fetchMemories();
+                e.target.value = null;
+            }
+        } else {
+            alert("No files were successfully uploaded to storage.");
+        }
+
         setUploading(false);
+        setUploadProgress(0);
     };
 
     const update = async (id, field, value) => {
@@ -375,12 +586,49 @@ const MemoriesEditor = ({ checkpointId }) => {
     };
 
     const remove = async (id) => {
-        const memory = memories.find(m => m.id === id);
-        if (!memory) return;
-
         if (window.confirm('Remove this memory forever?')) {
             await supabase.from('memories').delete().eq('id', id);
             setMemories(memories.filter(m => m.id !== id));
+        }
+    };
+
+    const toggleFlip = (id, e) => {
+        e.stopPropagation();
+        setFlippedCards(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const handleDragStart = (id) => {
+        setDraggedId(id);
+    };
+
+    const handleDragOver = (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) return;
+
+        const draggedIndex = memories.findIndex(m => m.id === draggedId);
+        const targetIndex = memories.findIndex(m => m.id === targetId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        const newMemories = [...memories];
+        const [removed] = newMemories.splice(draggedIndex, 1);
+        newMemories.splice(targetIndex, 0, removed);
+
+        setMemories(newMemories);
+    };
+
+    const handleDragEnd = async () => {
+        if (!draggedId) return;
+        setDraggedId(null);
+
+        // Persist new order to Supabase
+        const updates = memories.map((m, i) => ({
+            id: m.id,
+            order_index: i
+        }));
+
+        for (const { id, order_index } of updates) {
+            await supabase.from('memories').update({ order_index }).eq('id', id);
         }
     };
 
@@ -389,43 +637,130 @@ const MemoriesEditor = ({ checkpointId }) => {
     return (
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-3xl font-serif text-primary">Moment Gallery</h2>
+                <div>
+                    <h2 className="text-3xl font-serif text-primary">Moment Gallery</h2>
+                    <p className="text-xs text-stone-400 mt-1">Click to flip • Drag to reorder</p>
+                </div>
                 <label className={`w-full md:w-auto glass-capsule cursor-pointer bg-white border border-stone-200 shadow-sm hover:shadow-md transition-all px-8 py-3 flex items-center justify-center gap-3 text-sm font-bold text-primary ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <BsUpload className="text-red-400" /> {uploading ? 'Shuffling...' : 'Add a Moment'}
-                    <input type="file" className="hidden" onChange={upload} accept="image/*" />
+                    {uploading ? (
+                        <div className="flex items-center gap-3">
+                            <div className="relative w-5 h-5">
+                                <svg className="w-full h-full rotate-[-90deg]">
+                                    <circle cx="10" cy="10" r="8" fill="transparent" stroke="currentColor" strokeWidth="2" className="text-stone-100" />
+                                    <circle cx="10" cy="10" r="8" fill="transparent" stroke="currentColor" strokeWidth="2"
+                                        strokeDasharray={2 * Math.PI * 8}
+                                        strokeDashoffset={2 * Math.PI * 8 * (1 - uploadProgress / 100)}
+                                        className="text-red-400 transition-all duration-300"
+                                    />
+                                </svg>
+                            </div>
+                            <span>{uploadProgress}%</span>
+                        </div>
+                    ) : (
+                        <>
+                            <BsUpload className="text-red-400" />
+                            Add Moments
+                        </>
+                    )}
+                    <input type="file" className="hidden" onChange={upload} accept="image/*" multiple />
                 </label>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            {/* 3-Column Masonry Grid with Flip Cards */}
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-6">
                 {memories.map(m => (
-                    <div key={m.id} className="bg-white p-5 rounded-[2rem] border border-stone-100 shadow-sm group relative hover:shadow-md transition-all">
-                        <button onClick={() => remove(m.id)} className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur rounded-full text-stone-300 hover:text-red-400 shadow-sm opacity-0 group-hover:opacity-100 transition-all z-10"><BsTrash /></button>
-                        <div className="aspect-[4/5] md:aspect-video bg-stone-50 rounded-2xl overflow-hidden mb-5">
-                            <img src={m.image_url} className="w-full h-full object-cover" loading="lazy" />
-                        </div>
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-[9px] uppercase font-bold text-blue-300 tracking-[0.2em] ml-1">His perspective</label>
-                                <textarea
-                                    value={m.note_him || ''}
-                                    onChange={(e) => update(m.id, 'note_him', e.target.value)}
-                                    className="w-full bg-stone-50/50 border border-stone-50 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-50 transition-all h-20 resize-none font-serif italic"
-                                    placeholder="Add his note..."
+                    <div
+                        key={m.id}
+                        draggable={!flippedCards[m.id]}
+                        onDragStart={() => !flippedCards[m.id] && handleDragStart(m.id)}
+                        onDragOver={(e) => !flippedCards[m.id] && handleDragOver(e, m.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`relative mb-6 break-inside-avoid transition-all ${!flippedCards[m.id] ? 'cursor-grab active:cursor-grabbing' : ''} ${draggedId === m.id ? 'opacity-50 scale-95' : ''}`}
+                        style={{ perspective: '1000px' }}
+                    >
+                        <motion.div
+                            className="relative w-full"
+                            animate={{ rotateY: flippedCards[m.id] ? 180 : 0 }}
+                            transition={{ duration: 0.5, type: 'spring', stiffness: 300, damping: 25 }}
+                            style={{ transformStyle: 'preserve-3d' }}
+                        >
+                            {/* Front - The Image */}
+                            <div
+                                className="w-full relative overflow-hidden rounded-2xl shadow-lg group bg-white border border-stone-100"
+                                style={{ backfaceVisibility: 'hidden' }}
+                                onClick={() => setFlippedCards(prev => ({ ...prev, [m.id]: true }))}
+                            >
+                                <img
+                                    src={m.image_url}
+                                    alt="Memory"
+                                    className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105"
                                 />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                                    <span className="text-white text-xs font-mono uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded border border-white/30">
+                                        Click to Edit Notes
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); remove(m.id); }}
+                                    className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-stone-300 hover:text-red-400 shadow-sm opacity-0 group-hover:opacity-100 transition-all z-10"
+                                >
+                                    <BsTrash />
+                                </button>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[9px] uppercase font-bold text-pink-300 tracking-[0.2em] ml-1">Her perspective</label>
-                                <textarea
-                                    value={m.note_her || ''}
-                                    onChange={(e) => update(m.id, 'note_her', e.target.value)}
-                                    className="w-full bg-stone-50/50 border border-stone-50 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-pink-50 transition-all h-20 resize-none font-serif italic"
-                                    placeholder="Add her note..."
-                                />
+
+                            {/* Back - The Notes Editor */}
+                            <div
+                                className="absolute inset-0 rounded-2xl p-4 bg-white border border-stone-100 shadow-lg flex flex-col cursor-pointer"
+                                style={{
+                                    backfaceVisibility: 'hidden',
+                                    transform: 'rotateY(180deg)'
+                                }}
+                                onClick={() => setFlippedCards(prev => ({ ...prev, [m.id]: false }))}
+                            >
+                                {/* Flip arrow icon in corner */}
+                                <div className="absolute top-3 right-3 p-1.5 bg-stone-100 rounded-full text-stone-400 text-xs">
+                                    ↻
+                                </div>
+
+                                <div className="flex-1 space-y-3 overflow-y-auto">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] uppercase font-bold text-blue-400 tracking-[0.2em]">His Note</label>
+                                        <textarea
+                                            value={m.note_him || ''}
+                                            onChange={(e) => { update(m.id, 'note_him', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            onFocus={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-full bg-blue-50/50 border border-blue-100 rounded-lg px-3 py-2 text-sm outline-none focus:bg-white focus:border-blue-200 transition-all font-serif italic resize-none overflow-hidden"
+                                            placeholder="Add his note..."
+                                            rows={1}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] uppercase font-bold text-pink-400 tracking-[0.2em]">Her Note</label>
+                                        <textarea
+                                            value={m.note_her || ''}
+                                            onChange={(e) => { update(m.id, 'note_her', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            onFocus={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-full bg-pink-50/50 border border-pink-100 rounded-lg px-3 py-2 text-sm outline-none focus:bg-white focus:border-pink-200 transition-all font-serif italic resize-none overflow-hidden"
+                                            placeholder="Add her note..."
+                                            rows={1}
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                 ))}
             </div>
+
+            {memories.length === 0 && (
+                <div className="text-center py-16 bg-stone-50/50 rounded-3xl border border-dashed border-stone-200">
+                    <BsImages className="text-4xl text-stone-200 mx-auto mb-4" />
+                    <p className="font-serif italic text-stone-400 text-lg">No moments captured yet</p>
+                    <p className="text-xs text-stone-300 mt-2 uppercase tracking-widest">Upload photos to start building your gallery</p>
+                </div>
+            )}
         </div>
     );
 };

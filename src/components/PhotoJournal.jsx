@@ -7,28 +7,41 @@ const PhotoCard = ({ photo }) => {
     const [isFlipped, setIsFlipped] = useState(false);
 
     return (
-        <div className={`relative mb-6 break-inside-avoid min-h-[300px] perspective-1000`}>
+        <div
+            className="relative mb-6 break-inside-avoid cursor-pointer"
+            style={{ perspective: '1000px' }}
+            onClick={() => setIsFlipped(!isFlipped)}
+        >
             <motion.div
-                className="w-full h-full relative preserve-3d cursor-pointer"
+                className="relative w-full"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
-                onClick={() => setIsFlipped(!isFlipped)}
                 style={{ transformStyle: 'preserve-3d' }}
             >
-                <div className="absolute inset-0 backface-hidden">
-                    <div className="w-full h-full relative overflow-hidden rounded-2xl shadow-lg group">
-                        <img src={photo.image_url} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                            <span className="text-white text-xs font-mono uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded border border-white/30">
-                                Open Note
-                            </span>
-                        </div>
+                {/* Front - The Image */}
+                <div
+                    className="w-full relative overflow-hidden rounded-2xl shadow-lg group"
+                    style={{ backfaceVisibility: 'hidden' }}
+                >
+                    <img
+                        src={photo.image_url}
+                        alt="Memory"
+                        className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span className="text-white text-xs font-mono uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded border border-white/30">
+                            Open Note
+                        </span>
                     </div>
                 </div>
 
+                {/* Back - The Notes */}
                 <div
-                    className="absolute inset-0 backface-hidden rounded-2xl p-6 bg-white/95 backdrop-blur-xl border border-white/50 shadow-inner flex flex-col justify-center overflow-hidden"
-                    style={{ transform: 'rotateY(180deg)' }}
+                    className="absolute inset-0 rounded-2xl p-6 bg-white/95 backdrop-blur-xl border border-white/50 shadow-inner flex flex-col justify-center overflow-hidden"
+                    style={{
+                        backfaceVisibility: 'hidden',
+                        transform: 'rotateY(180deg)'
+                    }}
                 >
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#001 1px, transparent 1px)', backgroundSize: '100% 24px' }}></div>
 
