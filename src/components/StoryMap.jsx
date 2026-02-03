@@ -6,10 +6,10 @@ import { supabase } from '../lib/supabase';
 import PhotoJournal from './PhotoJournal';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const ITEM_HEIGHT = 120;
+const ITEM_HEIGHT = 150;
 
 // Custom Location Marker with rotating image preview
-const LocationMarker = ({ checkpoint, isActive, onClick, isDark }) => {
+const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark }) => {
     const [images, setImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -36,9 +36,18 @@ const LocationMarker = ({ checkpoint, isActive, onClick, isDark }) => {
         return () => clearInterval(interval);
     }, [images.length]);
 
+    // Handle click: if active, open journal; otherwise navigate to this marker
+    const handleClick = () => {
+        if (isActive && onOpenJournal) {
+            onOpenJournal();
+        } else {
+            onClick();
+        }
+    };
+
     return (
         <motion.div
-            onClick={onClick}
+            onClick={handleClick}
             className="cursor-pointer relative"
             animate={{
                 scale: isActive ? 1 : 0.75,
@@ -103,8 +112,8 @@ const LocationMarker = ({ checkpoint, isActive, onClick, isDark }) => {
                 <div className={`px-3 py-2 text-center backdrop-blur-md border-t ${isDark ? 'bg-black/60 border-white/5' : 'bg-white/80 border-white/40'
                     }`}>
                     <span className={`font-serif italic text-xs tracking-wide truncate block ${isActive
-                            ? isDark ? 'text-red-200' : 'text-red-900'
-                            : isDark ? 'text-stone-300' : 'text-stone-600'
+                        ? isDark ? 'text-red-200' : 'text-red-900'
+                        : isDark ? 'text-stone-300' : 'text-stone-600'
                         }`}>
                         {checkpoint.marker_label || checkpoint.title}
                     </span>
@@ -257,6 +266,7 @@ const StoryMap = ({ mapStylePreset }) => {
                                 checkpoint={site}
                                 isActive={activeCheckpoint === index}
                                 onClick={() => flyToLocation(index)}
+                                onOpenJournal={() => setJournalOpen(true)}
                                 isDark={isDarkStyle}
                             />
                         </Marker>
@@ -267,24 +277,45 @@ const StoryMap = ({ mapStylePreset }) => {
             </div>
 
             {/* Wheel Scroller UI */}
-            <div className="absolute left-0 md:left-20 top-1/2 -translate-y-1/2 z-20 w-full md:w-80 h-[400px] overflow-hidden select-none touch-none">
+            <div
+                className="absolute left-0 md:left-20 top-1/2 -translate-y-1/2 z-20 w-full md:w-80 h-[450px] overflow-hidden select-none touch-none"
+                onWheel={(e) => {
+                    // Debounce wheel events
+                    if (Math.abs(e.deltaY) > 20) {
+                        const direction = e.deltaY > 0 ? 1 : -1;
+                        // Use a timestamp to prevent rapid-fire scrolling
+                        const now = Date.now();
+                        if (!window.lastScroll || now - window.lastScroll > 500) {
+                            window.lastScroll = now;
+                            if (direction > 0 && activeCheckpoint < checkpoints.length - 1) {
+                                flyToLocation(activeCheckpoint + 1);
+                            } else if (direction < 0 && activeCheckpoint > 0) {
+                                flyToLocation(activeCheckpoint - 1);
+                            }
+                        }
+                    }
+                }}
+            >
                 {/* Visual Midline */}
                 <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
 
-                {/* The List (Controlled by State, Not Drag) */}
+                {/* The List (Direct Drag Enabled) */}
                 <motion.div
-                    className="absolute top-1/2 left-0 w-full z-40"
+                    className="absolute top-1/2 left-0 w-full z-40 cursor-grab active:cursor-grabbing"
                     initial={false}
                     animate={{ y: -activeCheckpoint * ITEM_HEIGHT }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    drag="y"
+                    dragConstraints={{ top: -((checkpoints.length - 1) * ITEM_HEIGHT), bottom: 0 }}
+                    dragElastic={0.2}
+                    onDragEnd={handleDragEnd}
                 >
                     {checkpoints.map((point, idx) => {
                         const isActive = activeCheckpoint === idx;
                         return (
                             <motion.div
                                 key={point.id}
-                                className={`h-[120px] flex flex-col justify-center px-10 md:pl-8 md:pr-0 border-l-4 md:border-l-2 transition-all cursor-pointer ${isActive ? 'border-red-400 opacity-100' : `${theme.border} opacity-20`}`}
-                                onClick={() => flyToLocation(idx)}
+                                className={`h-[150px] flex flex-col justify-center px-10 md:pl-8 md:pr-0 border-l-4 md:border-l-2 transition-all ${isActive ? 'border-red-400 opacity-100' : `${theme.border} opacity-20`}`}
                                 animate={{
                                     scale: isActive ? 1.05 : 0.9,
                                     x: isActive ? (window.innerWidth < 768 ? 20 : 10) : 0,
@@ -300,8 +331,8 @@ const StoryMap = ({ mapStylePreset }) => {
                                     <motion.button
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        onClick={(e) => { e.stopPropagation(); setJournalOpen(true); }}
-                                        className="mt-3 text-[10px] md:text-xs uppercase tracking-[0.3em] text-red-500 font-bold hover:text-red-600 transition-colors flex items-center gap-2"
+                                        onClick={() => setJournalOpen(true)}
+                                        className="mt-3 text-[10px] md:text-xs uppercase tracking-[0.3em] text-red-500 font-bold hover:text-red-600 transition-colors flex items-center gap-2 relative z-50 pointer-events-auto"
                                     >
                                         Explore Moments →
                                     </motion.button>
@@ -310,16 +341,6 @@ const StoryMap = ({ mapStylePreset }) => {
                         )
                     })}
                 </motion.div>
-
-                {/* INVISIBLE DRAG OVERLAY - The "Drivers Seat" */}
-                <motion.div
-                    className="absolute inset-0 z-30 cursor-grab active:cursor-grabbing"
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
-                    dragElastic={0}
-                    onDragEnd={handleDragEnd}
-                    style={{ opacity: 0 }}
-                />
 
                 {/* Fade Masks */}
                 <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${isDarkStyle ? 'from-stone-900' : 'from-white'} via-transparent to-transparent pointer-events-none`} />

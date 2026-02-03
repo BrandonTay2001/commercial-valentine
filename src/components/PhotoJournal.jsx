@@ -15,7 +15,7 @@ const PhotoCard = ({ photo }) => {
             <motion.div
                 className="relative w-full"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
-                transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
+                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 style={{ transformStyle: 'preserve-3d' }}
             >
                 {/* Front - The Image */}
@@ -108,7 +108,7 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
     return (
         <div className={`w-full ${isPage ? '' : 'snap-section'}`}>
             {memories.length > 0 ? (
-                <div className="columns-1 md:columns-2 lg:columns-3 gap-6 w-full pb-20">
+                <div className="columns-3 gap-2 md:gap-4 lg:gap-6 w-full pb-20">
                     {memories.map(photo => (
                         <PhotoCard key={photo.id} photo={photo} />
                     ))}

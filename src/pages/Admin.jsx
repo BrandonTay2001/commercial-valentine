@@ -50,7 +50,8 @@ const Admin = () => {
             return;
         }
         const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(name);
-        setSettings({ ...settings, hero_bg_url: publicUrl });
+        // Use updateSettings to persist the URL to database
+        updateSettings('hero_bg_url', publicUrl);
         setBgUploading(false);
     };
 
@@ -119,7 +120,7 @@ const Admin = () => {
                         animate={{ x: 0 }}
                         exit={{ x: -300 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="w-full md:w-80 bg-white border-r border-stone-200 flex flex-col pt-6 md:pt-10 fixed md:sticky top-0 h-full z-50 md:z-auto"
+                        className="w-full md:w-80 bg-white border-r border-stone-200 flex flex-col pt-16 md:pt-10 fixed md:sticky top-0 h-full z-50 md:z-auto"
                     >
                         <div className="px-8 mb-10 hidden md:flex justify-between items-center">
                             <div>
@@ -224,7 +225,16 @@ const Admin = () => {
                                                 </label>
                                                 {settings?.hero_bg_url && (
                                                     <button
-                                                        onClick={() => setSettings({ ...settings, hero_bg_url: '' })}
+                                                        onClick={async () => {
+                                                            // Extract file path from URL
+                                                            const url = settings.hero_bg_url;
+                                                            const pathMatch = url.match(/memories\/(.+)$/);
+                                                            if (pathMatch) {
+                                                                await supabase.storage.from('memories').remove([pathMatch[1]]);
+                                                            }
+                                                            // Clear from database
+                                                            updateSettings('hero_bg_url', '');
+                                                        }}
                                                         className="p-4 bg-red-50 text-red-400 rounded-2xl hover:bg-red-100 transition-colors"
                                                         title="Remove background"
                                                     >
@@ -239,7 +249,7 @@ const Admin = () => {
                                             <select
                                                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl px-6 py-3.5 outline-none focus:bg-white focus:border-red-100 transition-all"
                                                 value={settings?.map_style}
-                                                onChange={(e) => setSettings({ ...settings, map_style: e.target.value })}
+                                                onChange={(e) => updateSettings('map_style', e.target.value)}
                                             >
                                                 <option value="mapbox://styles/mapbox/light-v11">Classic Light</option>
                                                 <option value="mapbox://styles/mapbox/dark-v11">Elegant Dark</option>
@@ -247,6 +257,26 @@ const Admin = () => {
                                                 <option value="mapbox://styles/mapbox/streets-v12">Detailed Streets</option>
                                                 <option value="mapbox://styles/mapbox/outdoors-v12">Outdoor Terrain</option>
                                             </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Blur Intensity Slider */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Background Blur Intensity</label>
+                                            <span className="text-xs text-stone-400 font-mono">{settings?.hero_blur_amount || 16}px</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="30"
+                                            value={settings?.hero_blur_amount || 16}
+                                            onChange={(e) => updateSettings('hero_blur_amount', parseInt(e.target.value))}
+                                            className="w-full h-2 bg-stone-100 rounded-full appearance-none cursor-pointer accent-red-400"
+                                        />
+                                        <div className="flex justify-between text-[9px] text-stone-300 font-mono">
+                                            <span>Sharp</span>
+                                            <span>Blurry</span>
                                         </div>
                                     </div>
 
@@ -267,7 +297,7 @@ const Admin = () => {
                     ) : checkpoints[selectedCpIndex] ? (
                         <div className="space-y-8 md:space-y-12">
                             {/* Checkpoint Details */}
-                            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
+                            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative">
                                 <div className="absolute top-0 right-0 p-4 opacity-5 hidden md:block">
                                     <BsMap className="text-8xl" />
                                 </div>
@@ -587,6 +617,16 @@ const MemoriesEditor = ({ checkpointId }) => {
 
     const remove = async (id) => {
         if (window.confirm('Remove this memory forever?')) {
+            // Find the memory to get its image URL
+            const memory = memories.find(m => m.id === id);
+            if (memory?.image_url) {
+                // Extract file path from URL and delete from storage
+                const pathMatch = memory.image_url.match(/memories\/(.+)$/);
+                if (pathMatch) {
+                    await supabase.storage.from('memories').remove([pathMatch[1]]);
+                }
+            }
+            // Delete from database
             await supabase.from('memories').delete().eq('id', id);
             setMemories(memories.filter(m => m.id !== id));
         }

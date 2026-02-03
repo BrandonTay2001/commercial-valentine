@@ -133,7 +133,7 @@ const Home = () => {
                             backgroundImage: `url(${settings.hero_bg_url})`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
-                            filter: 'blur(20px) brightness(0.9)',
+                            filter: `blur(${settings?.hero_blur_amount || 16}px) brightness(0.9)`,
                             opacity: 0.8
                         }}
                     />
@@ -154,7 +154,7 @@ const Home = () => {
                             backgroundImage: `url(${settings.hero_bg_url})`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
-                            filter: 'blur(40px) brightness(1.1)',
+                            filter: `blur(${(settings?.hero_blur_amount || 16) * 2}px) brightness(1.1)`,
                             opacity: 0.6
                         }}
                     />
