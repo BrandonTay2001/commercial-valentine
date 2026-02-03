@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     BsArrowLeft, BsMap, BsImages, BsSave, BsPlus,
     BsTrash, BsShieldLock, BsUpload, BsMenuButtonWide,
-    BsX, BsGearWideConnected, BsGeoAlt, BsSearch
+    BsX, BsGearWideConnected, BsGeoAlt, BsSearch, BsGripVertical
 } from 'react-icons/bs';
 import { supabase } from '../lib/supabase';
 
@@ -18,10 +18,8 @@ const Admin = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
-        const isAuth = localStorage.getItem('isAuthenticated');
-        if (!isAuth) navigate('/login');
         fetchData();
-    }, [navigate]);
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);
@@ -91,6 +89,23 @@ const Admin = () => {
         autoSaveSettings(newSettings);
     };
 
+    // Handle Reorder and Auto-save
+    const saveOrderRef = React.useRef(null);
+    const handleReorder = (newOrder) => {
+        setCheckpoints(newOrder); // Optimistic UI update
+
+        if (saveOrderRef.current) clearTimeout(saveOrderRef.current);
+        saveOrderRef.current = setTimeout(async () => {
+            // Prepare payload with updated order_index
+            const payload = newOrder.map((cp, i) => ({ ...cp, order_index: i }));
+
+            // Batch upsert to persist order
+            // Note: We send full object to satisfy NOT NULL constraints on upsert
+            const { error } = await supabase.from('checkpoints').upsert(payload);
+            if (error) console.error('Error saving order:', error);
+        }, 1000);
+    };
+
     if (loading) return <div className="h-screen flex items-center justify-center font-serif italic text-stone-400">Summoning Studio...</div>;
 
     return (
@@ -142,27 +157,53 @@ const Admin = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-4 space-y-1 mb-8 custom-scrollbar">
-                            <p className="px-4 text-[10px] uppercase font-bold text-stone-300 mb-2 tracking-widest">Chapters</p>
-                            {checkpoints.map((cp, i) => (
-                                <button
-                                    key={cp.id || i}
-                                    onClick={() => {
-                                        setSelectedCpIndex(i);
-                                        setActiveTab('locations');
-                                        if (window.innerWidth < 768) setSidebarOpen(false);
-                                    }}
-                                    className={`w-full text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between group ${activeTab === 'locations' && selectedCpIndex === i ? 'bg-stone-100 text-primary font-medium' : 'hover:bg-stone-50 text-stone-400'}`}
-                                >
-                                    <span className="truncate pr-2">{cp.title || '(Untitled)'}</span>
-                                    {activeTab === 'locations' && selectedCpIndex === i && <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />}
-                                </button>
-                            ))}
+                            <p className="px-4 text-[10px] uppercase font-bold text-stone-300 mb-2 tracking-widest">Chapters (Drag to Reorder)</p>
+                            <Reorder.Group axis="y" values={checkpoints} onReorder={handleReorder} className="space-y-1">
+                                {checkpoints.map((cp, i) => (
+                                    <Reorder.Item key={cp.id} value={cp} className="relative group/item flex items-center pr-2 rounded-2xl hover:bg-stone-50 transition-colors">
+                                        {/* Drag Handle */}
+                                        <div className="p-3 cursor-grab active:cursor-grabbing text-stone-300 hover:text-red-300 transition-colors">
+                                            <BsGripVertical />
+                                        </div>
+
+                                        {/* Selection Button */}
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCpIndex(i);
+                                                setActiveTab('locations');
+                                                if (window.innerWidth < 768) setSidebarOpen(false);
+                                            }}
+                                            className={`flex-1 text-left py-3.5 pr-4 rounded-r-2xl transition-all flex items-center justify-between ${activeTab === 'locations' && selectedCpIndex === i ? 'text-primary font-medium' : 'text-stone-400'}`}
+                                        >
+                                            <span className="truncate pr-2">{cp.title || '(Untitled)'}</span>
+                                            {activeTab === 'locations' && selectedCpIndex === i && <div className="w-1.5 h-1.5 bg-red-400 rounded-full flex-shrink-0" />}
+                                        </button>
+                                    </Reorder.Item>
+                                ))}
+                            </Reorder.Group>
                             <button
-                                onClick={() => {
-                                    const newCp = { title: 'New Spot', date: '', description: '', latitude: 0, longitude: 0, zoom: 13, order_index: checkpoints.length };
-                                    setCheckpoints([...checkpoints, newCp]);
-                                    setSelectedCpIndex(checkpoints.length);
-                                    setActiveTab('locations');
+                                onClick={async () => {
+                                    const newCp = {
+                                        title: 'New Spot',
+                                        date: '',
+                                        description: '',
+                                        latitude: 0,
+                                        longitude: 0,
+                                        zoom: 13,
+                                        order_index: checkpoints.length
+                                    };
+
+                                    // Create in DB first to get ID
+                                    const { data, error } = await supabase.from('checkpoints').insert(newCp).select().single();
+
+                                    if (data) {
+                                        setCheckpoints([...checkpoints, data]);
+                                        setSelectedCpIndex(checkpoints.length);
+                                        setActiveTab('locations');
+                                    } else if (error) {
+                                        console.error('Error creating checkpoint:', error);
+                                        alert('Could not create new location. See console.');
+                                    }
                                 }}
                                 className="w-full text-left px-5 py-3.5 text-red-400 hover:bg-red-50 rounded-2xl flex items-center gap-3 text-sm font-medium mt-4 group"
                             >
@@ -297,6 +338,37 @@ const Admin = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Footer Customization */}
+                            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
+                                <h2 className="text-3xl font-serif text-primary mb-8">Footer Section</h2>
+
+                                <div className="space-y-6">
+                                    <Field
+                                        label="Footer Title"
+                                        value={settings?.footer_title}
+                                        onChange={(v) => updateSettings('footer_title', v)}
+                                        placeholder="To Forever & Beyond"
+                                    />
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Footer Description</label>
+                                        <textarea
+                                            className="w-full bg-stone-50 border border-stone-100 rounded-[2rem] px-6 py-5 outline-none h-32 resize-none focus:bg-white focus:border-red-100 transition-all"
+                                            value={settings?.footer_description || ''}
+                                            onChange={(e) => updateSettings('footer_description', e.target.value)}
+                                            placeholder="Built with love and shared memories..."
+                                        />
+                                    </div>
+
+                                    <Field
+                                        label="Footer Caption"
+                                        value={settings?.footer_caption}
+                                        onChange={(v) => updateSettings('footer_caption', v)}
+                                        placeholder="2026 Valentines"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     ) : checkpoints[selectedCpIndex] ? (
                         <div className="space-y-8 md:space-y-12">
@@ -384,7 +456,7 @@ const Admin = () => {
     );
 };
 
-const Field = ({ label, value, onChange, type = "text" }) => (
+const Field = ({ label, value, onChange, type = "text", placeholder = "" }) => (
     <div className="space-y-2">
         <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">{label}</label>
         <input
@@ -393,6 +465,7 @@ const Field = ({ label, value, onChange, type = "text" }) => (
             className="w-full bg-stone-50 border border-stone-100 rounded-2xl px-6 py-3.5 outline-none focus:bg-white focus:border-red-100 transition-all font-medium text-primary shadow-sm"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
         />
     </div>
 );
@@ -505,33 +578,33 @@ const AddressSearch = ({ latitude, longitude, address, onSelect }) => {
                         <div className="w-4 h-4 border-2 border-stone-200 border-t-red-400 rounded-full animate-spin" />
                     </div>
                 )}
-            </div>
 
-            {/* Suggestions Dropdown */}
-            <AnimatePresence>
-                {showDropdown && suggestions.length > 0 && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden max-h-60 overflow-y-auto"
-                    >
-                        {suggestions.map(s => (
-                            <button
-                                key={s.place_id}
-                                onClick={() => handleSelect(s)}
-                                className="w-full text-left px-5 py-3.5 hover:bg-stone-50 transition-colors flex items-start gap-3 border-b border-stone-50 last:border-0"
-                            >
-                                <BsGeoAlt className="text-red-400 mt-0.5 flex-shrink-0" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-primary">{s.name}</span>
-                                    <span className="text-xs text-stone-400">{s.full_address}</span>
-                                </div>
-                            </button>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                {/* Suggestions Dropdown */}
+                <AnimatePresence>
+                    {showDropdown && suggestions.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden max-h-60 overflow-y-auto"
+                        >
+                            {suggestions.map(s => (
+                                <button
+                                    key={s.place_id}
+                                    onClick={() => handleSelect(s)}
+                                    className="w-full text-left px-5 py-3.5 hover:bg-stone-50 transition-colors flex items-start gap-3 border-b border-stone-50 last:border-0"
+                                >
+                                    <BsGeoAlt className="text-red-400 mt-0.5 flex-shrink-0" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-primary">{s.name}</span>
+                                        <span className="text-xs text-stone-400">{s.full_address}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
             {/* Coordinates Preview */}
             {hasCoords && (

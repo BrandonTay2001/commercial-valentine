@@ -166,14 +166,18 @@ const Home = () => {
 
                     {/* Content Layer */}
                     <div className="relative z-10">
-                        <h2 className={`text-4xl font-serif italic mb-6 ${isDarkMap ? 'text-white' : 'text-primary'}`}>To Forever & Beyond</h2>
+                        <h2 className={`text-4xl font-serif italic mb-6 ${isDarkMap ? 'text-white' : 'text-primary'}`}>
+                            {settings?.footer_title || 'To Forever & Beyond'}
+                        </h2>
                         <p className="text-sm font-sans mb-12 leading-relaxed tracking-wide text-white mix-blend-difference">
-                            Built with love and shared memories. May our story continue to unfold in the most beautiful ways.
+                            {settings?.footer_description || 'Built with love and shared memories. May our story continue to unfold in the most beautiful ways.'}
                         </p>
 
                         <div className="flex flex-col items-center gap-6">
                             <div className={`w-12 h-px ${isDarkMap ? 'bg-white/10' : 'bg-stone-200'}`} />
-                            <p className="text-[10px] uppercase tracking-[0.4em] text-white mix-blend-difference">2026 Valentines</p>
+                            <p className="text-[10px] uppercase tracking-[0.4em] text-white mix-blend-difference">
+                                {settings?.footer_caption || '2026 Valentines'}
+                            </p>
 
                             <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${isDarkMap ? 'border-white/20 text-stone-300 hover:text-white hover:border-white' : 'border-stone-100 text-white mix-blend-difference hover:border-primary'}`}>
                                 Studio Access
