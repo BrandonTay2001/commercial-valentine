@@ -8,7 +8,7 @@ const PhotoCard = ({ photo }) => {
 
     return (
         <div
-            className="relative mb-3 md:mb-6 break-inside-avoid cursor-pointer"
+            className="relative cursor-pointer"
             style={{ perspective: '1000px' }}
             onClick={() => setIsFlipped(!isFlipped)}
         >
@@ -98,6 +98,28 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
         fetchMemories();
     }, [checkpointId]);
 
+    const [columns, setColumns] = useState(2);
+
+    useEffect(() => {
+        const updateColumns = () => {
+            setColumns(window.innerWidth < 768 ? 2 : 3);
+        };
+
+        // Set initial
+        updateColumns();
+
+        window.addEventListener('resize', updateColumns);
+        return () => window.removeEventListener('resize', updateColumns);
+    }, []);
+
+    const getDistributedMemories = () => {
+        const dist = Array.from({ length: columns }, () => []);
+        memories.forEach((memory, index) => {
+            dist[index % columns].push(memory);
+        });
+        return dist;
+    };
+
     if (loading) return (
         <div className="py-20 flex flex-col items-center justify-center space-y-4 text-stone-300">
             <div className="w-8 h-8 border-2 border-stone-200 border-t-red-400 rounded-full animate-spin" />
@@ -105,12 +127,18 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
         </div>
     );
 
+    const distributedMemories = getDistributedMemories();
+
     return (
         <div className={`w-full ${isPage ? '' : 'snap-section'}`}>
             {memories.length > 0 ? (
-                <div className="columns-2 md:columns-3 gap-3 w-full pb-20 space-y-3">
-                    {memories.map(photo => (
-                        <PhotoCard key={photo.id} photo={photo} />
+                <div className="flex flex-row gap-3 md:gap-4 w-full pb-20 items-start">
+                    {distributedMemories.map((colMemories, colIndex) => (
+                        <div key={colIndex} className="flex flex-col gap-3 md:gap-4 flex-1 min-w-0">
+                            {colMemories.map(photo => (
+                                <PhotoCard key={photo.id} photo={photo} />
+                            ))}
+                        </div>
                     ))}
                 </div>
             ) : (

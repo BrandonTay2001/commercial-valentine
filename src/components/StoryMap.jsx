@@ -222,11 +222,12 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
         });
     };
 
-    // Apple-style momentum scrolling - calculates how many items to skip based on velocity
+    // Improved momentum scrolling for mobile
     const handleDragEnd = (_, info) => {
         const { offset, velocity } = info;
+        const ROW_HEIGHT = 150;
 
-        // Hand-off Logic for section navigation
+        // Vertical boundary Hand-off Logic
         if (activeCheckpoint === 0 && offset.y > 100) {
             document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' });
             return;
@@ -236,26 +237,28 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             return;
         }
 
-        // Calculate items to skip based on velocity (iOS picker momentum feel)
-        // Higher velocity = more items skipped
-        const velocityThreshold = 200;
-        const maxSkip = 3; // Maximum items to skip at once
+        // Calculate predicted travel based on velocity (inertial scroll simulation)
+        // Adjust multiplier to tune "friction"
+        const velocityFactor = 0.2;
+        const predictedOffset = offset.y + (velocity.y * velocityFactor);
 
-        let itemsToSkip = 0;
+        // Calculate how many items we should shift by
+        // Dragging UP (negative y) -> Next items (Increment Index)
+        // Dragging DOWN (positive y) -> Previous items (Decrement Index)
+        const itemsMoved = -Math.round(predictedOffset / ROW_HEIGHT);
 
-        if (Math.abs(velocity.y) > velocityThreshold) {
-            // Velocity-based: faster swipe = skip more items
-            itemsToSkip = Math.min(maxSkip, Math.floor(Math.abs(velocity.y) / 400));
-            itemsToSkip = Math.max(1, itemsToSkip);
-        } else if (Math.abs(offset.y) > 40) {
-            // Offset-based: small drag = move 1 item
-            itemsToSkip = 1;
-        }
+        let targetIndex = activeCheckpoint + itemsMoved;
 
-        if (itemsToSkip > 0) {
-            const direction = (offset.y > 0 || velocity.y > velocityThreshold) ? -1 : 1;
-            const targetIndex = Math.max(0, Math.min(checkpoints.length - 1, activeCheckpoint + (direction * itemsToSkip)));
+        // Clamp to valid range
+        targetIndex = Math.max(0, Math.min(checkpoints.length - 1, targetIndex));
+
+        // Only fly if we are actually changing location
+        if (targetIndex !== activeCheckpoint) {
             flyToLocation(targetIndex);
+        } else {
+            // If we didn't change index, the standard spring animation will snap us back
+            // But we need to ensure any internal state is consistent if needed
+            // (framer motion handles the visual snap back to original y since we didn't update state)
         }
     };
 
@@ -341,9 +344,6 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             >
                 {/* Visual Midline */}
                 <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
-
-                {/* Mobile Active Indicator (Subtle pill) */}
-                <div className="absolute top-1/2 left-6 md:hidden w-1 h-12 -translate-y-1/2 bg-red-400/50 rounded-full z-0"></div>
 
                 {/* The List - Apple-style picker with momentum */}
                 <motion.div
