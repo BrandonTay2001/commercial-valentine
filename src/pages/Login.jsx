@@ -11,8 +11,8 @@ const Login = () => {
     const handleLogin = (e) => {
         e.preventDefault();
         // Simple mock authentication
-        if (password === 'love2026') {
-            localStorage.setItem('isAuthenticated', 'true');
+        if (password === import.meta.env.VITE_ADMIN_PASSWORD) {
+            sessionStorage.setItem('isAuthenticated', 'true');
             navigate('/admin');
         } else {
             setError('Incorrect secret key. Please try again.');

@@ -30,7 +30,7 @@ const Sidebar = ({
                             <h1 className="font-serif italic text-2xl text-primary leading-none">Studio</h1>
                             <p className="text-[9px] uppercase tracking-[0.3em] text-accent mt-1">Admin Dashboard</p>
                         </div>
-                        <button onClick={() => { localStorage.removeItem('isAuthenticated'); navigate('/login'); }} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button>
+                        <button onClick={() => { sessionStorage.removeItem('isAuthenticated'); navigate('/login'); }} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button>
                     </div>
 
                     {/* Top Level Nav */}

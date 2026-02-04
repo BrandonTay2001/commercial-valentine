@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
  * Immediately redirects to /login if not authenticated (no flash of protected content).
  */
 const ProtectedRoute = ({ children }) => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;

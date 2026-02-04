@@ -353,7 +353,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
 
             {/* Wheel Scroller UI - Compact Mobile Design */}
             <div
-                className="absolute left-0 md:left-20 bottom-32 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none"
+                className="absolute left-0 md:left-20 bottom-32 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none touch-none"
                 onWheel={(e) => {
                     // Optimized wheel handler
                     if (Math.abs(e.deltaY) > 10) {
@@ -386,9 +386,10 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                     drag="y"
                     dragConstraints={{ top: -((checkpoints.length - 1) * ITEM_HEIGHT), bottom: 0 }}
                     dragElastic={0.2}
+                    dragDirectionLock={true}
                     dragTransition={{
-                        power: 0.1, // Reduced power for more control
-                        timeConstant: 200,
+                        power: 0.4, // Increased from 0.1 for more momentum
+                        timeConstant: 400, // Increased from 200 for smoother glide
                         modifyTarget: (target) => {
                             // Strict grid snapping
                             const snapped = Math.round(target / ITEM_HEIGHT) * ITEM_HEIGHT;
