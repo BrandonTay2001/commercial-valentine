@@ -1,17 +1,26 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { FaHeart, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabase';
-import PhotoJournal from './PhotoJournal';
 import 'mapbox-gl/dist/mapbox-gl.css';
+
+const PhotoJournal = lazy(() => import('./PhotoJournal'));
 
 const ITEM_HEIGHT = 150;
 
 // Custom Location Marker with rotating image preview
-const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, shouldLoadImages = false }) => {
-    const [images, setImages] = useState([]);
+const LocationMarker = React.memo(({ checkpoint, isActive, onClick, onOpenJournal, isDark, shouldLoadImages = false, previewImage }) => {
+    // Initialize with previewImage if available
+    const [images, setImages] = useState(previewImage ? [previewImage] : []);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    // Update images if previewImage changes and we have nothing else (rare case of late load)
+    useEffect(() => {
+        if (previewImage && images.length === 0) {
+            setImages([previewImage]);
+        }
+    }, [previewImage]);
 
     // Optimized image fetching:
     // - Distant markers (shouldLoadImages=false): Fetch only 1 image for preview
@@ -64,13 +73,13 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
     }, [images.length, isActive]);
 
     // Handle click: if active, open journal; otherwise navigate to this marker
-    const handleClick = () => {
+    const handleClick = useCallback(() => {
         if (isActive && onOpenJournal) {
             onOpenJournal();
         } else {
             onClick();
         }
-    };
+    }, [isActive, onOpenJournal, onClick]);
 
     return (
         <motion.div
@@ -161,15 +170,17 @@ const LocationMarker = ({ checkpoint, isActive, onClick, onOpenJournal, isDark, 
             )}
         </motion.div>
     );
-};
+});
 
 const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
     const mapRef = useRef(null);
     const [checkpoints, setCheckpoints] = useState([]);
+    const [previewImages, setPreviewImages] = useState({}); // Map of checkpoint_id -> image_url
     const [activeCheckpoint, setActiveCheckpoint] = useState(0);
     const [loading, setLoading] = useState(true);
     const [journalOpen, setJournalOpen] = useState(false);
-    const [viewState, setViewState] = useState({
+    // Uncontrolled map -- only store initial state or update via ref
+    const [initialViewState, setInitialViewState] = useState({
         latitude: 0,
         longitude: 0,
         zoom: globalZoom,
@@ -178,7 +189,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
 
     useEffect(() => {
         fetchCheckpoints();
-    }, [globalZoom, globalPitch]); // Re-fetch/re-center if globals change significantly? actually maybe just re-apply viewstate is enough but fetching is fine for now
+    }, [globalZoom, globalPitch]);
 
     const fetchCheckpoints = async () => {
         const { data, error } = await supabase
@@ -188,18 +199,36 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
 
         if (!error && data && data.length > 0) {
             setCheckpoints(data);
-            setViewState(prev => ({
-                ...prev,
+            setInitialViewState({ // Set initial view ONLY once ideally, or when data loads
                 latitude: data[0].latitude,
                 longitude: data[0].longitude,
                 zoom: globalZoom || data[0].zoom || 13,
                 pitch: globalPitch
-            }));
+            });
+
+            // Batch fetch first images for all checkpoints
+            // We fetch all memories with limit logic or just all and filter in JS (easier for now if dataset < 1000)
+            // Optimization: Fetch only necessary fields
+            const { data: memories } = await supabase
+                .from('memories')
+                .select('checkpoint_id, image_url, order_index')
+                .order('order_index', { ascending: true });
+
+            if (memories) {
+                const previews = {};
+                // Since they are ordered, the first one we encounter for each checkpoint is the first one
+                memories.forEach(m => {
+                    if (!previews[m.checkpoint_id]) {
+                        previews[m.checkpoint_id] = m.image_url;
+                    }
+                });
+                setPreviewImages(previews);
+            }
         }
         setLoading(false);
     };
 
-    const flyToLocation = (index) => {
+    const flyToLocation = useCallback((index) => {
         // Strict Bounds Check
         if (index < 0) index = 0;
         if (index >= checkpoints.length) index = checkpoints.length - 1;
@@ -220,7 +249,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             easing: (t) => 1 - Math.pow(1 - t, 3),
             essential: true
         });
-    };
+    }, [checkpoints, globalZoom, globalPitch]);
 
     // Improved momentum scrolling for mobile
     const handleDragEnd = (_, info) => {
@@ -293,8 +322,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             <div className="absolute inset-0 z-0">
                 <Map
                     ref={mapRef}
-                    {...viewState}
-                    onMove={evt => setViewState(evt.viewState)}
+                    initialViewState={initialViewState}
                     mapStyle={MAP_STYLE}
                     mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
                     dragRotate={false}
@@ -314,6 +342,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                                 onOpenJournal={() => setJournalOpen(true)}
                                 isDark={isDarkStyle}
                                 shouldLoadImages={Math.abs(activeCheckpoint - index) <= 1}
+                                previewImage={previewImages[site.id]}
                             />
                         </Marker>
                     ))}
@@ -326,13 +355,13 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             <div
                 className="absolute left-0 md:left-20 bottom-32 md:top-1/2 md:-translate-y-1/2 z-20 w-full md:w-80 h-[240px] md:h-[450px] overflow-hidden select-none"
                 onWheel={(e) => {
-                    // Debounce wheel events
-                    if (Math.abs(e.deltaY) > 20) {
-                        const direction = e.deltaY > 0 ? 1 : -1;
-                        // Use a timestamp to prevent rapid-fire scrolling
+                    // Optimized wheel handler
+                    if (Math.abs(e.deltaY) > 10) {
                         const now = Date.now();
-                        if (!window.lastScroll || now - window.lastScroll > 500) {
+                        // Reduce debounce to 100ms for more responsive feel
+                        if (!window.lastScroll || now - window.lastScroll > 100) {
                             window.lastScroll = now;
+                            const direction = e.deltaY > 0 ? 1 : -1;
                             if (direction > 0 && activeCheckpoint < checkpoints.length - 1) {
                                 flyToLocation(activeCheckpoint + 1);
                             } else if (direction < 0 && activeCheckpoint > 0) {
@@ -342,23 +371,49 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                     }
                 }}
             >
-                {/* Visual Midline */}
-                <div className="absolute top-1/2 left-0 w-full h-px bg-red-400/20 z-0 pointer-events-none md:block hidden"></div>
 
-                {/* The List - Apple-style picker with momentum */}
+
                 <motion.div
-                    className="absolute top-1/2 left-0 w-full z-40 cursor-grab active:cursor-grabbing"
+                    className="absolute top-1/2 left-0 w-full z-40 cursor-grab active:cursor-grabbing touch-none"
+                    style={{ marginTop: -75 }} // Center the active item (150px / 2)
                     initial={false}
                     animate={{ y: -activeCheckpoint * ITEM_HEIGHT }}
                     transition={{
-                        type: "tween",
-                        duration: 0.4,
-                        ease: [0.32, 0.72, 0, 1] // iOS-style easing curve
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
                     }}
                     drag="y"
                     dragConstraints={{ top: -((checkpoints.length - 1) * ITEM_HEIGHT), bottom: 0 }}
-                    dragElastic={0.1}
-                    onDragEnd={handleDragEnd}
+                    dragElastic={0.2}
+                    dragTransition={{
+                        power: 0.1, // Reduced power for more control
+                        timeConstant: 200,
+                        modifyTarget: (target) => {
+                            // Strict grid snapping
+                            const snapped = Math.round(target / ITEM_HEIGHT) * ITEM_HEIGHT;
+                            // Clamp within bounds
+                            const max = 0;
+                            const min = -((checkpoints.length - 1) * ITEM_HEIGHT);
+                            return Math.max(min, Math.min(max, snapped));
+                        }
+                    }}
+                    onDragEnd={(e, { offset, velocity }) => {
+                        // Calculate the index we SHOULD be at based on the snap
+                        // We duplicate the snap logic here to update React state
+                        const currentY = -activeCheckpoint * ITEM_HEIGHT;
+                        const predictedY = currentY + offset.y + (velocity.y * 0.1);
+                        const snappedY = Math.round(predictedY / ITEM_HEIGHT) * ITEM_HEIGHT;
+
+                        const targetIndex = Math.abs(Math.round(snappedY / ITEM_HEIGHT));
+
+                        // Guard against NaN or bounds
+                        const safeIndex = Math.max(0, Math.min(checkpoints.length - 1, targetIndex));
+
+                        if (safeIndex !== activeCheckpoint) {
+                            flyToLocation(safeIndex);
+                        }
+                    }}
                 >
                     {checkpoints.map((point, idx) => {
                         const isActive = activeCheckpoint === idx;
@@ -369,7 +424,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                                 animate={{
                                     scale: isActive ? 1.05 : 0.85,
                                     x: isActive ? (window.innerWidth < 768 ? 10 : 10) : 0,
-                                    y: isActive && window.innerWidth < 768 ? -60 : 0, // Shift active item up on mobile
+                                    y: 0,
                                     opacity: isActive ? 1 : (isDarkStyle ? 0.3 : 0.4),
                                     filter: isActive ? 'blur(0px)' : 'blur(1px)' // Blur distant items for depth
                                 }}
@@ -446,7 +501,9 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                                 )}
                             </div>
 
-                            <PhotoJournal checkpointId={currentCp.id} isPage={true} />
+                            <Suspense fallback={<div className="p-20 text-center">Loading Journal...</div>}>
+                                <PhotoJournal checkpointId={currentCp.id} isPage={true} />
+                            </Suspense>
                         </div>
                     </motion.div>
                 )}

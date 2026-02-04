@@ -1,20 +1,28 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
-import Album from './pages/Album';
-import Login from './pages/Login';
-import Admin from './pages/Admin';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Lazy loading pages
+const Home = lazy(() => import('./pages/Home'));
+const Album = lazy(() => import('./pages/Album'));
+const Login = lazy(() => import('./pages/Login'));
+const Admin = lazy(() => import('./pages/Admin'));
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/album" element={<Album />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-      </Routes>
+      <Suspense fallback={
+        <div className="h-screen w-full flex items-center justify-center bg-stone-50">
+          <div className="text-display italic text-2xl animate-pulse text-stone-300">Loading...</div>
+        </div>
+      }>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/album" element={<Album />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
