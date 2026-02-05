@@ -37,7 +37,7 @@ const CoupleSiteContent = () => {
         });
 
         return () => observer.disconnect();
-    }, []);
+    }, [loading]);
 
     if (loading) {
         return (
