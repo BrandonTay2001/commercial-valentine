@@ -7,6 +7,8 @@ const Home = lazy(() => import('./pages/Home'));
 const Album = lazy(() => import('./pages/Album'));
 const Login = lazy(() => import('./pages/Login'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const CoupleSite = lazy(() => import('./pages/CoupleSite'));
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/album" element={<Album />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/:path" element={<CoupleSite />} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
         </Routes>
       </Suspense>

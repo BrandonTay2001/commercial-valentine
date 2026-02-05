@@ -10,7 +10,8 @@ const SiteSettings = ({
     bgUploading,
     optimizing,
     optimizeLibrary,
-    optProgress
+    optProgress,
+    couple = null
 }) => {
     return (
         <div className="space-y-8 md:space-y-12">

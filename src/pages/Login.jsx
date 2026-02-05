@@ -1,21 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { BsArrowLeft, BsShieldLock } from 'react-icons/bs';
+import { supabase } from '../lib/supabase';
 
 const Login = () => {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = (e) => {
+    useEffect(() => {
+        // Check if user is already logged in
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                // User is logged in, redirect based on whether they have a couple
+                const { data: couple } = await supabase
+                    .from('couples')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (couple) {
+                    navigate('/admin', { replace: true });
+                } else {
+                    navigate('/onboarding', { replace: true });
+                }
+            }
+        };
+
+        checkAuth();
+    }, [navigate]);
+
+    const handleLogin = async (e) => {
         e.preventDefault();
-        // Simple mock authentication
-        if (password === import.meta.env.VITE_ADMIN_PASSWORD) {
-            sessionStorage.setItem('isAuthenticated', 'true');
-            navigate('/admin');
-        } else {
-            setError('Incorrect secret key. Please try again.');
+        setError('');
+        setLoading(true);
+
+        try {
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (signInError) {
+                throw signInError;
+            }
+
+            if (data.user) {
+                // Check if user has a couple
+                const { data: couple, error: coupleError } = await supabase
+                    .from('couples')
+                    .select('*')
+                    .eq('user_id', data.user.id)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (coupleError && coupleError.code !== 'PGRST116') {
+                    throw coupleError;
+                }
+
+                if (couple) {
+                    navigate('/admin');
+                } else {
+                    navigate('/onboarding');
+                }
+            }
+        } catch (err) {
+            setError(err.message || 'Failed to sign in. Please check your credentials.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -43,34 +100,61 @@ const Login = () => {
                     <div className="p-4 bg-white/50 rounded-full mb-4 shadow-sm border border-white/60">
                         <BsShieldLock className="text-3xl text-primary" />
                     </div>
-                    <h1 className="text-3xl font-serif italic text-primary">Entrance</h1>
-                    <p className="text-sm text-secondary mt-2">Enter the secret key to access settings.</p>
+                    <h1 className="text-3xl font-serif italic text-primary">Welcome Back</h1>
+                    <p className="text-sm text-secondary mt-2">Sign in to manage your love story.</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div>
+                        <label className="block text-xs font-medium text-secondary mb-1">Email</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full bg-white/40 border border-white/60 rounded-xl px-5 py-3 outline-none focus:bg-white/60 focus:border-red-200 transition-all"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-secondary mb-1">Password</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Secret Key"
-                            className="w-full bg-white/40 border border-white/60 rounded-xl px-5 py-3 outline-none focus:bg-white/60 focus:border-red-200 transition-all text-center tracking-widest"
+                            placeholder="Your password"
+                            className="w-full bg-white/40 border border-white/60 rounded-xl px-5 py-3 outline-none focus:bg-white/60 focus:border-red-200 transition-all"
+                            required
                         />
-                        {error && <p className="text-xs text-red-400 mt-2 text-center">{error}</p>}
                     </div>
+
+                    {error && <p className="text-xs text-red-400">{error}</p>}
 
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         type="submit"
-                        className="w-full py-3 bg-primary text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                        disabled={loading}
+                        className="w-full py-3 bg-primary text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
                     >
-                        Authenticate
+                        {loading ? 'Signing In...' : 'Sign In'}
                     </motion.button>
                 </form>
 
+                <p className="text-xs text-center text-secondary mt-6">
+                    Don't have an account?{' '}
+                    <button
+                        type="button"
+                        onClick={() => navigate('/onboarding')}
+                        className="text-primary font-medium hover:underline"
+                    >
+                        Get Started
+                    </button>
+                </p>
+
                 <p className="text-[10px] text-center text-accent/60 mt-8 uppercase tracking-[0.2em]">
-                    Restricted Access • Authorized Only
+                    Secure Access • Your Story, Your Control
                 </p>
             </motion.div>
         </div>

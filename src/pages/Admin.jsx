@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BsArrowLeft, BsMenuButtonWide, BsX } from 'react-icons/bs';
+import { BsArrowLeft, BsMenuButtonWide, BsX, BsBoxArrowRight } from 'react-icons/bs';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { compressImage } from '../utils/imageCompression';
@@ -19,22 +19,65 @@ const Admin = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [optimizing, setOptimizing] = useState(false);
     const [optProgress, setOptProgress] = useState({ current: 0, total: 0 });
+    const [couple, setCouple] = useState(null);
 
     useEffect(() => {
-        fetchData();
+        checkAuthAndFetchData();
     }, []);
 
-    const fetchData = async () => {
+    const checkAuthAndFetchData = async () => {
+        // Check auth session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            navigate('/login', { replace: true });
+            return;
+        }
+
+        // Fetch user's couple
+        const { data: coupleData, error: coupleError } = await supabase
+            .from('couples')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (coupleError || !coupleData) {
+            // No couple found, redirect to onboarding
+            navigate('/onboarding', { replace: true });
+            return;
+        }
+
+        setCouple(coupleData);
+        await fetchData(coupleData.id);
+    };
+
+    const fetchData = async (coupleId) => {
         setLoading(true);
-        // Fetch locations
-        const { data: cpData } = await supabase.from('checkpoints').select('*').order('order_index', { ascending: true });
+        // Fetch locations scoped to couple
+        const { data: cpData } = await supabase
+            .from('checkpoints')
+            .select('*')
+            .eq('couple_id', coupleId)
+            .order('order_index', { ascending: true });
         if (cpData) setCheckpoints(cpData);
 
-        // Fetch settings
-        const { data: settingsData } = await supabase.from('site_settings').select('*').single();
-        if (settingsData) setSettings(settingsData);
+        // Fetch settings from couple
+        const { data: coupleData } = await supabase
+            .from('couples')
+            .select('*')
+            .eq('id', coupleId)
+            .single();
+        if (coupleData) {
+            setSettings(coupleData);
+            setCouple(coupleData);
+        }
 
         setLoading(false);
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate('/login', { replace: true });
     };
 
     const [bgUploading, setBgUploading] = useState(false);
@@ -74,7 +117,9 @@ const Admin = () => {
     const autoSaveSettings = (newSettings) => {
         if (saveSettingsRef.current) clearTimeout(saveSettingsRef.current);
         saveSettingsRef.current = setTimeout(async () => {
-            await supabase.from('site_settings').update(newSettings).eq('id', 1);
+            // Update the couples table with new settings
+            const { id, created_at, user_id, ...updates } = newSettings;
+            await supabase.from('couples').update(updates).eq('id', couple.id);
         }, 500);
     };
 
@@ -86,10 +131,11 @@ const Admin = () => {
         autoSaveCheckpoint(next[index]);
     };
 
-    // Helper to update settings and trigger auto-save  
+    // Helper to update settings and trigger auto-save
     const updateSettings = (field, value) => {
         const newSettings = { ...settings, [field]: value };
         setSettings(newSettings);
+        setCouple(newSettings);
         autoSaveSettings(newSettings);
     };
 
@@ -111,12 +157,15 @@ const Admin = () => {
     };
 
     const optimizeLibrary = async () => {
-        if (!confirm("This will scan all images, compress massive files (>500KB), and re-upload them. This reduces map lag but may take a few minutes. Continue?")) return;
+        if (!confirm("This will scan all your images, compress massive files (>500KB), and re-upload them. This reduces map lag but may take a few minutes. Continue?")) return;
 
         setOptimizing(true);
         try {
-            // 1. Fetch all memories
-            const { data: memories, error } = await supabase.from('memories').select('*');
+            // 1. Fetch all memories scoped to couple
+            const { data: memories, error } = await supabase
+                .from('memories')
+                .select('*')
+                .eq('couple_id', couple.id);
             if (error) throw error;
 
             console.log(`Found ${memories.length} memories to check.`);
@@ -185,7 +234,13 @@ const Admin = () => {
                         <h1 className="font-serif italic text-lg leading-tight">Studio</h1>
                     </div>
                 </div>
-                <div className="text-[9px] uppercase tracking-widest text-stone-300 font-bold">Auto-saves</div>
+                <button
+                    onClick={handleLogout}
+                    className="p-2 bg-stone-100 rounded-lg text-primary"
+                    title="Sign out"
+                >
+                    <BsBoxArrowRight className="text-xl" />
+                </button>
             </div>
 
             {/* Sidebar */}
@@ -200,6 +255,8 @@ const Admin = () => {
                 selectedCpIndex={selectedCpIndex}
                 setSelectedCpIndex={setSelectedCpIndex}
                 navigate={navigate}
+                couple={couple}
+                onLogout={handleLogout}
             />
 
             {/* Overlay for mobile sidebar */}
@@ -219,22 +276,24 @@ const Admin = () => {
                             optimizing={optimizing}
                             optimizeLibrary={optimizeLibrary}
                             optProgress={optProgress}
+                            couple={couple}
                         />
                     ) : (
                         <LocationEditor
                             checkpoint={checkpoints[selectedCpIndex]}
                             updateCheckpoint={updateCheckpoint}
                             autoSaveCheckpoint={autoSaveCheckpoint}
-                            fetchData={fetchData}
+                            fetchData={() => fetchData(couple.id)}
                             checkpoints={checkpoints}
                             setCheckpoints={setCheckpoints}
                             selectedCpIndex={selectedCpIndex}
+                            coupleId={couple.id}
                         />
                     )}
                 </div>
             </div>
 
-            <button onClick={() => navigate('/')} className="fixed bottom-6 left-6 md:left-auto md:right-8 p-4 bg-white rounded-full shadow-xl border border-stone-100 text-stone-400 hover:text-primary transition-all hover:scale-110 z-[60] active:scale-95">
+            <button onClick={() => navigate(`/${couple?.path || ''}`)} className="fixed bottom-6 left-6 md:left-auto md:right-8 p-4 bg-white rounded-full shadow-xl border border-stone-100 text-stone-400 hover:text-primary transition-all hover:scale-110 z-[60] active:scale-95">
                 <BsArrowLeft className="text-xl" />
             </button>
         </div>

@@ -13,7 +13,9 @@ const Sidebar = ({
     setSelectedCpIndex,
     setCheckpoints,
     setSidebarOpen,
-    navigate
+    navigate,
+    couple = null,
+    onLogout = null
 }) => {
     return (
         <AnimatePresence>
@@ -30,7 +32,7 @@ const Sidebar = ({
                             <h1 className="font-serif italic text-2xl text-primary leading-none">Studio</h1>
                             <p className="text-[9px] uppercase tracking-[0.3em] text-accent mt-1">Admin Dashboard</p>
                         </div>
-                        <button onClick={() => { sessionStorage.removeItem('isAuthenticated'); navigate('/login'); }} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button>
+                        <button onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/login'); })} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button>
                     </div>
 
                     {/* Top Level Nav */}
@@ -73,12 +75,12 @@ const Sidebar = ({
                             onClick={async () => {
                                 const newCp = {
                                     title: 'New Spot',
-                                    date: '',
+                                    date_visited: null,
                                     description: '',
                                     latitude: 0,
                                     longitude: 0,
-                                    zoom: 13,
-                                    order_index: checkpoints.length
+                                    order_index: checkpoints.length,
+                                    ...(couple?.id && { couple_id: couple.id })
                                 };
 
                                 // Create in DB first to get ID

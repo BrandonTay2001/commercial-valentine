@@ -172,7 +172,7 @@ const LocationMarker = React.memo(({ checkpoint, isActive, onClick, onOpenJourna
     );
 });
 
-const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
+const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0, coupleId = null }) => {
     const mapRef = useRef(null);
     const [checkpoints, setCheckpoints] = useState([]);
     const [previewImages, setPreviewImages] = useState({}); // Map of checkpoint_id -> image_url
@@ -189,13 +189,20 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
 
     useEffect(() => {
         fetchCheckpoints();
-    }, [globalZoom, globalPitch]);
+    }, [globalZoom, globalPitch, coupleId]);
 
     const fetchCheckpoints = async () => {
-        const { data, error } = await supabase
+        let query = supabase
             .from('checkpoints')
             .select('*')
             .order('order_index', { ascending: true });
+
+        // Filter by couple_id if provided (for multi-user support)
+        if (coupleId) {
+            query = query.eq('couple_id', coupleId);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data && data.length > 0) {
             setCheckpoints(data);
@@ -209,10 +216,17 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
             // Batch fetch first images for all checkpoints
             // We fetch all memories with limit logic or just all and filter in JS (easier for now if dataset < 1000)
             // Optimization: Fetch only necessary fields
-            const { data: memories } = await supabase
+            let memoriesQuery = supabase
                 .from('memories')
                 .select('checkpoint_id, image_url, order_index')
                 .order('order_index', { ascending: true });
+
+            // Also filter memories by couple_id if provided
+            if (coupleId) {
+                memoriesQuery = memoriesQuery.eq('couple_id', coupleId);
+            }
+
+            const { data: memories } = await memoriesQuery;
 
             if (memories) {
                 const previews = {};
@@ -433,7 +447,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                                 <h4 className={`font-serif text-3xl md:text-3xl lg:text-4xl leading-tight ${isActive ? theme.textPrimary : theme.textMuted}`}>
                                     {point.title}
                                 </h4>
-                                <p className={`text-xs md:text-sm ${theme.textSecondary} font-mono mb-1 tracking-widest`}>{point.date}</p>
+                                <p className={`text-xs md:text-sm ${theme.textSecondary} font-mono mb-1 tracking-widest`}>{point.date_visited}</p>
 
                                 {isActive && (
                                     <motion.button
@@ -503,7 +517,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0 }) => {
                             </div>
 
                             <Suspense fallback={<div className="p-20 text-center">Loading Journal...</div>}>
-                                <PhotoJournal checkpointId={currentCp.id} isPage={true} />
+                                <PhotoJournal checkpointId={currentCp.id} isPage={true} coupleId={coupleId} />
                             </Suspense>
                         </div>
                     </motion.div>

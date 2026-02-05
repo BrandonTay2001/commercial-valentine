@@ -71,9 +71,11 @@ const Home = () => {
 
     useEffect(() => {
         const fetchSettings = async () => {
+            // Fetch the demo couple settings (path='demo' was created in migration)
             const { data } = await supabase
-                .from('site_settings')
+                .from('couples')
                 .select('*')
+                .eq('path', 'demo')
                 .single();
             if (data) setSettings(data);
         };
@@ -81,8 +83,8 @@ const Home = () => {
 
         // Subscribe to changes
         const subscription = supabase
-            .channel('site_settings_changes')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_settings' }, (payload) => {
+            .channel('demo_couple_changes')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples', filter: 'path=eq.demo' }, (payload) => {
                 setSettings(payload.new);
             })
             .subscribe();

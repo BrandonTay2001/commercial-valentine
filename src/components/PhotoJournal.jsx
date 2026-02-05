@@ -74,7 +74,7 @@ const PhotoCard = ({ photo }) => {
     );
 };
 
-const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
+const PhotoJournal = ({ checkpointId = null, isPage = false, coupleId = null }) => {
     const [memories, setMemories] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -87,6 +87,11 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
                 query = query.eq('checkpoint_id', checkpointId);
             }
 
+            // Filter by couple_id if provided (for multi-user support)
+            if (coupleId) {
+                query = query.eq('couple_id', coupleId);
+            }
+
             const { data, error } = await query;
 
             if (!error && data) {
@@ -96,7 +101,7 @@ const PhotoJournal = ({ checkpointId = null, isPage = false }) => {
         };
 
         fetchMemories();
-    }, [checkpointId]);
+    }, [checkpointId, coupleId]);
 
     const [columns, setColumns] = useState(2);
 

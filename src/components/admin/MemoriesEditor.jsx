@@ -4,7 +4,7 @@ import { BsArrowLeft, BsImages, BsUpload, BsTrash } from 'react-icons/bs';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../utils/imageCompression';
 
-const MemoriesEditor = ({ checkpointId }) => {
+const MemoriesEditor = ({ checkpointId, coupleId = null }) => {
     const [memories, setMemoriesState] = useState([]);
     const memoriesRef = useRef([]); // Always keep latest memories here
 
@@ -85,10 +85,17 @@ const MemoriesEditor = ({ checkpointId }) => {
 
     const fetchMemories = React.useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.from('memories').select('*').eq('checkpoint_id', checkpointId).order('order_index', { ascending: true });
+        let query = supabase.from('memories').select('*').eq('checkpoint_id', checkpointId);
+
+        // Filter by couple_id if provided (for multi-user support)
+        if (coupleId) {
+            query = query.eq('couple_id', coupleId);
+        }
+
+        const { data } = await query.order('order_index', { ascending: true });
         if (data) setMemories(data);
         setLoading(false);
-    }, [checkpointId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [checkpointId, coupleId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         fetchMemories();
@@ -128,7 +135,8 @@ const MemoriesEditor = ({ checkpointId }) => {
                 uploadResults.push({
                     checkpoint_id: checkpointId,
                     image_url: publicUrl,
-                    order_index: memories.length + index
+                    order_index: memories.length + index,
+                    ...(coupleId && { couple_id: coupleId })
                 });
             } else {
                 console.error("Storage upload error:", uploadError);

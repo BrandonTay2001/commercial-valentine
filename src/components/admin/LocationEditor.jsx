@@ -13,6 +13,7 @@ const LocationEditor = ({
     checkpoints,
     setCheckpoints,
     selectedCpIndex,
+    coupleId = null,
     // dbDelete // Pass a callback or handle delete inside
 }) => {
     // If no checkpoint selected, show placeholder
@@ -58,7 +59,7 @@ const LocationEditor = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     <AdminField label="Location Name" value={checkpoint.title} onChange={(v) => updateCheckpoint(selectedCpIndex, 'title', v)} />
                     <AdminField label="Map Marker Label" value={checkpoint.marker_label || ''} onChange={(v) => updateCheckpoint(selectedCpIndex, 'marker_label', v)} placeholder="Short name for map pin" />
-                    <AdminField label="Special Date" value={checkpoint.date} onChange={(v) => updateCheckpoint(selectedCpIndex, 'date', v)} />
+                    <AdminField label="Special Date" type="date" value={checkpoint.date_visited || ''} onChange={(v) => updateCheckpoint(selectedCpIndex, 'date_visited', v)} />
                     <div className="col-span-1 md:col-span-2">
                         <AddressSearch
                             latitude={checkpoint.latitude}
@@ -88,7 +89,7 @@ const LocationEditor = ({
 
             {/* Photo Journal Editor */}
             {checkpoint.id ? (
-                <MemoriesEditor checkpointId={checkpoint.id} />
+                <MemoriesEditor checkpointId={checkpoint.id} coupleId={coupleId} />
             ) : (
                 <div className="bg-stone-100/50 border-2 border-dashed border-stone-200 p-12 rounded-[2.5rem] text-center">
                     <p className="font-serif italic text-stone-400 mb-4 text-xl">Almost there!</p>
