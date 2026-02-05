@@ -16,12 +16,19 @@ const PhotoCard = ({ photo }) => {
                 className="relative w-full"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-                style={{ transformStyle: 'preserve-3d' }}
+                style={{
+                    transformStyle: 'preserve-3d',
+                    willChange: 'transform' // Hint to browser to promote to layer
+                }}
             >
                 {/* Front - The Image */}
                 <div
                     className="w-full relative overflow-hidden rounded-2xl shadow-lg group"
-                    style={{ backfaceVisibility: 'hidden' }}
+                    style={{
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden', // iOS Safari support
+                        transform: 'translateZ(0)' // Force GPU acceleration
+                    }}
                 >
                     <img
                         src={photo.image_url}
@@ -37,10 +44,11 @@ const PhotoCard = ({ photo }) => {
 
                 {/* Back - The Notes */}
                 <div
-                    className="absolute inset-0 rounded-2xl p-6 bg-white/95 backdrop-blur-xl border border-white/50 shadow-inner flex flex-col justify-center overflow-hidden"
+                    className="absolute inset-0 rounded-2xl p-6 bg-white/95 backdrop-blur-sm border border-white/50 shadow-inner flex flex-col justify-center overflow-hidden"
                     style={{
                         backfaceVisibility: 'hidden',
-                        transform: 'rotateY(180deg)'
+                        WebkitBackfaceVisibility: 'hidden', // iOS Safari support
+                        transform: 'rotateY(180deg) translateZ(0)' // Force GPU acceleration on the back face too
                     }}
                 >
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#001 1px, transparent 1px)', backgroundSize: '100% 24px' }}></div>
