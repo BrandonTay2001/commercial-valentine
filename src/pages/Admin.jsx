@@ -99,44 +99,71 @@ const Admin = () => {
         setBgUploading(false);
     };
 
-    // Auto-save checkpoint (debounced)
-    const saveCheckpointRef = React.useRef(null);
-    const autoSaveCheckpoint = (checkpoint) => {
-        if (saveCheckpointRef.current) clearTimeout(saveCheckpointRef.current);
-        saveCheckpointRef.current = setTimeout(async () => {
-            if (!checkpoint.id) return; // Can't save unsaved checkpoint
-            // Exclude address field if it exists (not in DB schema)
-            // eslint-disable-next-line no-unused-vars
-            const { address, ...cpToSave } = checkpoint;
-            await supabase.from('checkpoints').upsert(cpToSave);
-        }, 500);
+    // Validate checkpoint for non-nullable fields
+    const validateCheckpoint = (checkpoint) => {
+        const errors = {};
+        if (!checkpoint.title || checkpoint.title.trim() === '') {
+            errors.title = 'Location Name is required';
+        }
+        if (checkpoint.latitude === null || checkpoint.latitude === undefined || checkpoint.latitude === '') {
+            errors.latitude = 'Location coordinates are required';
+        }
+        if (checkpoint.longitude === null || checkpoint.longitude === undefined || checkpoint.longitude === '') {
+            errors.longitude = 'Location coordinates are required';
+        }
+        return errors;
     };
 
-    // Auto-save settings (debounced)
-    const saveSettingsRef = React.useRef(null);
-    const autoSaveSettings = (newSettings) => {
-        if (saveSettingsRef.current) clearTimeout(saveSettingsRef.current);
-        saveSettingsRef.current = setTimeout(async () => {
-            // Update the couples table with new settings
-            const { id, created_at, user_id, ...updates } = newSettings;
-            await supabase.from('couples').update(updates).eq('id', couple.id);
-        }, 500);
+    // Manual save checkpoint
+    const saveCheckpoint = async (checkpoint) => {
+        const errors = validateCheckpoint(checkpoint);
+        if (Object.keys(errors).length > 0) {
+            return { success: false, errors };
+        }
+
+        const isNew = !checkpoint.id;
+        const { data, error } = await supabase
+            .from('checkpoints')
+            .upsert(checkpoint)
+            .select()
+            .single();
+
+        if (error) {
+            return { success: false, errors: { general: error.message } };
+        }
+
+        // Only refetch for new checkpoints to get the generated ID
+        // For existing checkpoints, update local state without full reload
+        if (isNew && data) {
+            await fetchData(couple.id);
+        }
+        return { success: true, errors: {} };
     };
 
-    // Helper to update checkpoint and trigger auto-save
+    // Manual save settings
+    const saveSettings = async () => {
+        // Update the couples table with new settings
+        const { id, created_at, user_id, ...updates } = settings;
+        const { error } = await supabase.from('couples').update(updates).eq('id', couple.id);
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+        return { success: true };
+    };
+
+    // Helper to update checkpoint locally (no auto-save)
     const updateCheckpoint = (index, field, value) => {
         const next = [...checkpoints];
         next[index] = { ...next[index], [field]: value };
         setCheckpoints(next);
-        autoSaveCheckpoint(next[index]);
     };
 
-    // Helper to update settings and trigger auto-save
+    // Helper to update settings locally (no auto-save)
     const updateSettings = (field, value) => {
         const newSettings = { ...settings, [field]: value };
         setSettings(newSettings);
         setCouple(newSettings);
-        autoSaveSettings(newSettings);
     };
 
     // Handle Reorder and Auto-save
@@ -234,13 +261,8 @@ const Admin = () => {
                         <h1 className="font-serif italic text-lg leading-tight">Studio</h1>
                     </div>
                 </div>
-                <button
-                    onClick={handleLogout}
-                    className="p-2 bg-stone-100 rounded-lg text-primary"
-                    title="Sign out"
-                >
-                    <BsBoxArrowRight className="text-xl" />
-                </button>
+                <div className="flex items-center gap-2">
+                </div>
             </div>
 
             {/* Sidebar */}
@@ -271,6 +293,7 @@ const Admin = () => {
                         <SiteSettings
                             settings={settings}
                             updateSettings={updateSettings}
+                            saveSettings={saveSettings}
                             uploadBg={uploadBg}
                             bgUploading={bgUploading}
                             optimizing={optimizing}
@@ -282,7 +305,8 @@ const Admin = () => {
                         <LocationEditor
                             checkpoint={checkpoints[selectedCpIndex]}
                             updateCheckpoint={updateCheckpoint}
-                            autoSaveCheckpoint={autoSaveCheckpoint}
+                            saveCheckpoint={saveCheckpoint}
+                            validateCheckpoint={validateCheckpoint}
                             fetchData={() => fetchData(couple.id)}
                             checkpoints={checkpoints}
                             setCheckpoints={setCheckpoints}
@@ -293,9 +317,9 @@ const Admin = () => {
                 </div>
             </div>
 
-            <button onClick={() => navigate(`/${couple?.path || ''}`)} className="fixed bottom-6 left-6 md:left-auto md:right-8 p-4 bg-white rounded-full shadow-xl border border-stone-100 text-stone-400 hover:text-primary transition-all hover:scale-110 z-[60] active:scale-95">
+            {/* <button onClick={() => navigate(`/${couple?.path || ''}`)} className="fixed bottom-6 left-6 md:left-auto md:right-8 p-4 bg-white rounded-full shadow-xl border border-stone-100 text-stone-400 hover:text-primary transition-all hover:scale-110 z-[60] active:scale-95">
                 <BsArrowLeft className="text-xl" />
-            </button>
+            </button> */}
         </div>
     );
 };

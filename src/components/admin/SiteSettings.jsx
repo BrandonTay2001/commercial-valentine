@@ -1,11 +1,12 @@
-import React from 'react';
-import { BsGearWideConnected, BsUpload, BsTrash } from 'react-icons/bs';
+import React, { useState } from 'react';
+import { BsGearWideConnected, BsUpload, BsTrash, BsCheckCircle } from 'react-icons/bs';
 import AdminField from './AdminField';
 import { supabase } from '../../lib/supabase';
 
 const SiteSettings = ({
     settings,
     updateSettings,
+    saveSettings,
     uploadBg,
     bgUploading,
     optimizing,
@@ -13,6 +14,27 @@ const SiteSettings = ({
     optProgress,
     couple = null
 }) => {
+    const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [saveError, setSaveError] = useState(null);
+
+    const handleSave = async () => {
+        setSaving(true);
+        setSaveError(null);
+        setSaveSuccess(false);
+
+        const result = await saveSettings();
+
+        if (result.success) {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2000);
+        } else {
+            setSaveError(result.error);
+        }
+
+        setSaving(false);
+    };
+
     return (
         <div className="space-y-8 md:space-y-12">
             <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
@@ -71,11 +93,11 @@ const SiteSettings = ({
                             <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2 font-sans">Map Style Preset</label>
                             <select
                                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl px-6 py-3.5 outline-none focus:bg-white focus:border-red-100 transition-all"
-                                value={settings?.map_style}
+                                value={settings?.map_style || 'mapbox://styles/mapbox/dark-v11'}
                                 onChange={(e) => updateSettings('map_style', e.target.value)}
                             >
-                                <option value="mapbox://styles/mapbox/light-v11">Classic Light</option>
                                 <option value="mapbox://styles/mapbox/dark-v11">Elegant Dark</option>
+                                <option value="mapbox://styles/mapbox/light-v11">Classic Light</option>
                                 <option value="mapbox://styles/mapbox/satellite-v9">Photorealistic Satellite</option>
                                 <option value="mapbox://styles/mapbox/streets-v12">Detailed Streets</option>
                                 <option value="mapbox://styles/mapbox/outdoors-v12">Outdoor Terrain</option>
@@ -150,21 +172,54 @@ const SiteSettings = ({
                         </div>
                     </div>
 
-                    {settings?.hero_bg_url && (
-                        <div className="mt-4">
-                            <p className="text-[9px] uppercase font-bold text-stone-300 ml-2 mb-2">Preview (Blurred)</p>
-                            <div className="w-full h-40 rounded-3xl overflow-hidden relative">
-                                <img
-                                    src={settings.hero_bg_url}
-                                    className="w-full h-full object-cover scale-110 transition-all duration-300"
-                                    style={{ filter: `blur(${settings?.hero_blur_amount || 16}px)` }}
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center text-white font-serif italic text-2xl shadow-inner">
-                                    {settings.hero_title}
-                                </div>
+                    {/* Text Color Selector */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Text Color (Hero & Footer)</label>
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => updateSettings('text_color', 'white')}
+                                className={`flex-1 py-3 px-6 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all border ${(settings?.text_color || 'white') === 'white'
+                                    ? 'bg-stone-800 text-white border-stone-800'
+                                    : 'bg-stone-50 text-stone-500 border-stone-100 hover:border-stone-300'
+                                    }`}
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <span className="w-4 h-4 rounded-full bg-white border border-stone-300" />
+                                    White
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => updateSettings('text_color', 'black')}
+                                className={`flex-1 py-3 px-6 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all border ${settings?.text_color === 'black'
+                                    ? 'bg-stone-800 text-white border-stone-800'
+                                    : 'bg-stone-50 text-stone-500 border-stone-100 hover:border-stone-300'
+                                    }`}
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <span className="w-4 h-4 rounded-full bg-stone-900 border border-stone-900" />
+                                    Black
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-4">
+                        <p className="text-[9px] uppercase font-bold text-stone-300 ml-2 mb-2">Preview (Blurred)</p>
+                        <div className="w-full h-40 rounded-3xl overflow-hidden relative">
+                            <img
+                                src={settings?.hero_bg_url || '/default-couple-bg.png'}
+                                className="w-full h-full object-cover scale-110 transition-all duration-300"
+                                style={{ filter: `blur(${settings?.hero_blur_amount || 16}px)` }}
+                            />
+                            <div className="absolute inset-0 bg-black/30" />
+                            <div className={`absolute inset-0 flex items-center justify-center font-serif italic text-2xl shadow-inner ${(settings?.text_color || 'white') === 'black' ? 'text-black/90' : 'text-white'
+                                }`}>
+                                {settings?.hero_title || 'Our Story'}
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
 
@@ -196,6 +251,39 @@ const SiteSettings = ({
                         onChange={(v) => updateSettings('footer_caption', v)}
                         placeholder="2026 Valentines"
                     />
+                </div>
+
+                {/* Save Error */}
+                {saveError && (
+                    <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-2xl">
+                        <p className="text-red-500 text-sm">{saveError}</p>
+                    </div>
+                )}
+
+                {/* Save Button */}
+                <div className="mt-8 flex justify-end">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className={`px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all flex items-center gap-3 ${saveSuccess
+                            ? 'bg-green-500 text-white'
+                            : 'bg-primary text-white hover:bg-primary/90'
+                            } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        {saving ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Saving...
+                            </>
+                        ) : saveSuccess ? (
+                            <>
+                                <BsCheckCircle className="text-lg" />
+                                Saved!
+                            </>
+                        ) : (
+                            'Save Settings'
+                        )}
+                    </button>
                 </div>
             </div>
 

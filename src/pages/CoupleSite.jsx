@@ -139,18 +139,16 @@ const CoupleSiteContent = () => {
 
             <div id="hero" className="snap-section relative overflow-hidden flex flex-col items-center justify-center">
                 {/* Custom Blurred Background */}
-                {couple?.hero_bg_url && (
-                    <div
-                        className="absolute inset-0 z-0 scale-110"
-                        style={{
-                            backgroundImage: `url(${couple.hero_bg_url})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: `blur(${couple?.hero_blur_amount || 16}px) brightness(0.9)`,
-                            opacity: 0.8
-                        }}
-                    />
-                )}
+                <div
+                    className="absolute inset-0 z-0 scale-110"
+                    style={{
+                        backgroundImage: `url(${couple?.hero_bg_url || '/default-couple-bg.png'})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: `blur(${couple?.hero_blur_amount || 16}px) brightness(0.9)`,
+                        opacity: 0.8
+                    }}
+                />
                 <HeroSection settings={couple} />
             </div>
 
@@ -165,44 +163,56 @@ const CoupleSiteContent = () => {
 
             <footer id="footer" className="snap-section relative overflow-hidden min-h-screen flex flex-col items-center justify-center">
                 {/* Mirrored Blurred Background */}
-                {couple?.hero_bg_url && (
-                    <div
-                        className="absolute inset-0 z-0 scale-110"
-                        style={{
-                            backgroundImage: `url(${couple.hero_bg_url})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: `blur(${(couple?.hero_blur_amount || 16) * 2}px) brightness(1.1)`,
-                            opacity: 0.6
-                        }}
-                    />
-                )}
+                <div
+                    className="absolute inset-0 z-0 scale-110"
+                    style={{
+                        backgroundImage: `url(${couple?.hero_bg_url || '/default-couple-bg.png'})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: `blur(${(couple?.hero_blur_amount || 16) * 2}px) brightness(1.1)`,
+                        opacity: 0.6
+                    }}
+                />
 
-                <div className="max-w-md text-center px-6 relative z-10 p-12 py-16">
-                    {/* Glass Background Layer */}
-                    <div className={`absolute inset-0 rounded-[2.5rem] backdrop-blur-xl border ${isDarkMap ? 'bg-black/10 border-white/10' : 'bg-white/10 border-stone-100'}`} />
+                {(() => {
+                    const textColor = couple?.text_color || 'white';
+                    const isWhite = textColor === 'white';
+                    const textClasses = {
+                        title: isWhite ? 'text-white' : 'text-black',
+                        description: isWhite ? 'text-white/80' : 'text-black/80',
+                        caption: isWhite ? 'text-white/60' : 'text-black/60',
+                        divider: isWhite ? 'bg-white/20' : 'bg-black/20',
+                        link: isWhite ? 'border-white/20 text-white/60 hover:text-white hover:border-white' : 'border-black/20 text-black/60 hover:text-black hover:border-black'
+                    };
 
-                    {/* Content Layer */}
-                    <div className="relative z-10">
-                        <h2 className={`text-4xl font-serif italic mb-6 ${isDarkMap ? 'text-white' : 'text-primary'}`}>
-                            {couple?.footer_title || 'To Forever & Beyond'}
-                        </h2>
-                        <p className="text-sm font-sans mb-12 leading-relaxed tracking-wide text-white mix-blend-difference">
-                            {couple?.footer_description || 'Built with love and shared memories. May our story continue to unfold in the most beautiful ways.'}
-                        </p>
+                    return (
+                        <div className="max-w-md text-center px-6 relative z-10 p-12 py-16">
+                            {/* Glass Background Layer */}
+                            <div className={`absolute inset-0 rounded-[2.5rem] backdrop-blur-xl border ${isWhite ? 'bg-black/10 border-white/10' : 'bg-white/30 border-black/10'}`} />
 
-                        <div className="flex flex-col items-center gap-6">
-                            <div className={`w-12 h-px ${isDarkMap ? 'bg-white/10' : 'bg-stone-200'}`} />
-                            <p className="text-[10px] uppercase tracking-[0.4em] text-white mix-blend-difference">
-                                {couple?.footer_caption || '2026 Valentines'}
-                            </p>
+                            {/* Content Layer */}
+                            <div className="relative z-10">
+                                <h2 className={`text-4xl font-serif italic mb-6 ${textClasses.title}`}>
+                                    {couple?.footer_title || 'To Forever & Beyond'}
+                                </h2>
+                                <p className={`text-sm font-sans mb-12 leading-relaxed tracking-wide ${textClasses.description}`}>
+                                    {couple?.footer_description || 'Built with love and shared memories. May our story continue to unfold in the most beautiful ways.'}
+                                </p>
 
-                            <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${isDarkMap ? 'border-white/20 text-stone-300 hover:text-white hover:border-white' : 'border-stone-100 text-white mix-blend-difference hover:border-primary'}`}>
-                                Studio Access
-                            </Link>
+                                <div className="flex flex-col items-center gap-6">
+                                    <div className={`w-12 h-px ${textClasses.divider}`} />
+                                    <p className={`text-[10px] uppercase tracking-[0.4em] ${textClasses.caption}`}>
+                                        {couple?.footer_caption || '2026 Valentines'}
+                                    </p>
+
+                                    <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${textClasses.link}`}>
+                                        Studio Access
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    );
+                })()}
             </footer>
         </div>
     );

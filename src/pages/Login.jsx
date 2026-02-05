@@ -89,12 +89,6 @@ const Login = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="glass-panel w-full max-w-md p-10 relative z-10"
             >
-                <button
-                    onClick={() => navigate('/')}
-                    className="absolute top-6 left-6 text-accent hover:text-primary transition-colors flex items-center gap-2 text-sm"
-                >
-                    <BsArrowLeft /> Back
-                </button>
 
                 <div className="flex flex-col items-center mb-8 pt-4">
                     <div className="p-4 bg-white/50 rounded-full mb-4 shadow-sm border border-white/60">
@@ -142,7 +136,7 @@ const Login = () => {
                     </motion.button>
                 </form>
 
-                <p className="text-xs text-center text-secondary mt-6">
+                {/* <p className="text-xs text-center text-secondary mt-6">
                     Don't have an account?{' '}
                     <button
                         type="button"
@@ -151,7 +145,7 @@ const Login = () => {
                     >
                         Get Started
                     </button>
-                </p>
+                </p> */}
 
                 <p className="text-[10px] text-center text-accent/60 mt-8 uppercase tracking-[0.2em]">
                     Secure Access • Your Story, Your Control

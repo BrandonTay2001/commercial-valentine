@@ -87,7 +87,7 @@ const AddressSearch = ({ latitude, longitude, address, onSelect }) => {
         }
     };
 
-    const hasCoords = latitude && longitude && (latitude !== 0 || longitude !== 0);
+    const hasCoords = !!(latitude && longitude && (latitude !== 0 || longitude !== 0));
 
     return (
         <div className="space-y-2">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { BsShieldLock, BsGearWideConnected, BsGripVertical, BsPlus } from 'react-icons/bs';
+import { BsShieldLock, BsGearWideConnected, BsGripVertical, BsPlus, BsBoxArrowUpRight, BsEnvelope } from 'react-icons/bs';
 import { supabase } from '../../lib/supabase';
 
 const Sidebar = ({
@@ -32,7 +32,7 @@ const Sidebar = ({
                             <h1 className="font-serif italic text-2xl text-primary leading-none">Studio</h1>
                             <p className="text-[9px] uppercase tracking-[0.3em] text-accent mt-1">Admin Dashboard</p>
                         </div>
-                        <button onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/login'); })} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button>
+                        {/* <button onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/'); })} className="text-stone-300 hover:text-red-400 transition-colors"><BsShieldLock /></button> */}
                     </div>
 
                     {/* Top Level Nav */}
@@ -104,9 +104,36 @@ const Sidebar = ({
                         </button>
                     </div>
 
-                    <div className="p-6 border-t border-stone-100 bg-white">
-                        <div className="text-center text-xs text-stone-300 font-medium py-2">
-                            ✓ Auto-saves as you type
+                    <div className="p-6 border-t border-stone-100 bg-white space-y-3">
+                        <div className="text-center text-xs text-stone-300 font-medium py-1">
+                            ✓ Moments' notes auto-save as you type
+                        </div>
+                        {couple?.path && (
+                            <a
+                                href={`/${couple.path}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-all text-sm font-medium group"
+                            >
+                                <BsBoxArrowUpRight className="text-sm group-hover:scale-110 transition-transform" />
+                                <span>View Site</span>
+                            </a>
+                        )}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/'); })}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-medium group"
+                            >
+                                <BsShieldLock className="text-lg group-hover:scale-110 transition-transform" />
+                                <span>Logout</span>
+                            </button>
+                            <a
+                                href="mailto:virality.ventures.apps@gmail.com"
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-primary hover:bg-primary/5 transition-all text-sm font-medium group"
+                            >
+                                <BsEnvelope className="text-lg group-hover:scale-110 transition-transform" />
+                                <span>Help</span>
+                            </a>
                         </div>
                     </div>
                 </motion.div>

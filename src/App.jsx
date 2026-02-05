@@ -19,9 +19,8 @@ function App() {
         </div>
       }>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Login />} />
           <Route path="/album" element={<Album />} />
-          <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/:path" element={<CoupleSite />} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
