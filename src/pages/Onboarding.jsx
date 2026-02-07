@@ -67,7 +67,12 @@ const Onboarding = () => {
     const validateStripeSession = async (sessionId) => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.functions.invoke('validate-stripe-session', {
+            // Use prod function when VITE_IS_PRODUCTION is true
+            const functionName = import.meta.env.VITE_IS_PRODUCTION === 'true'
+                ? 'validate-stripe-session-prod'
+                : 'validate-stripe-session';
+
+            const { data, error } = await supabase.functions.invoke(functionName, {
                 body: { sessionId },
             });
 
