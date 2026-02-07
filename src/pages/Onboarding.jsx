@@ -16,6 +16,7 @@ const Onboarding = () => {
     const [error, setError] = useState('');
     const [stripeValidated, setStripeValidated] = useState(false);
     const [stripeEmail, setStripeEmail] = useState('');
+    const [stripeSubscriptionId, setStripeSubscriptionId] = useState('');
 
     // Auth form state
     const [email, setEmail] = useState('');
@@ -82,6 +83,7 @@ const Onboarding = () => {
 
             setStripeValidated(true);
             setStripeEmail(data.customerEmail || '');
+            setStripeSubscriptionId(data.subscriptionId || '');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -222,6 +224,7 @@ const Onboarding = () => {
                     user_id: user.id,
                     couple_name: coupleName.trim(),
                     path: path.trim().toLowerCase(),
+                    stripe_subscription_id: stripeSubscriptionId || null,
                 })
                 .select()
                 .single();

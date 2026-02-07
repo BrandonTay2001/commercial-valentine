@@ -94,9 +94,19 @@ couples (id, user_id, path, couple_name, stripe_subscription_id, ..., is_active)
 
 ## Stripe Integration
 
-**Edge Function**: `supabase/functions/validate-stripe-session/index.ts`
-- Validates Stripe checkout sessions before allowing account creation
-- Deployed via: `supabase functions deploy validate-stripe-session --no-verify-jwt`
+**Edge Functions**:
+
+1. `supabase/functions/validate-stripe-session/index.ts`
+   - Validates Stripe checkout sessions before allowing account creation
+   - Deploy: `supabase functions deploy validate-stripe-session --no-verify-jwt`
+
+2. `supabase/functions/handle-subscription-cancel/index.ts`
+   - Webhook handler for Stripe subscription cancellations
+   - Deletes couple data (cascades to checkpoints/memories) and auth user when subscription is cancelled
+   - Deploy: `supabase functions deploy handle-subscription-cancel --no-verify-jwt`
+   - Required secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+   - Configure Stripe webhook to point to: `https://<project-ref>.supabase.co/functions/v1/handle-subscription-cancel`
+   - Listen for event: `customer.subscription.deleted`
 
 **Stripe Success Redirect URL**: `https://your-domain.com/onboarding?session_id={CHECKOUT_SESSION_ID}`
 
