@@ -127,7 +127,9 @@ const MemoriesEditor = ({ checkpointId, coupleId = null }) => {
                 console.warn("Compression failed, using original file", err);
             }
 
-            const name = `optimized/${Date.now()}-${fileToUpload.name}`;
+            // Sanitize filename: replace spaces and special characters with underscores
+            const sanitizedFileName = fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const name = `optimized/${Date.now()}-${sanitizedFileName}`;
             const { error: uploadError } = await supabase.storage.from('memories').upload(name, fileToUpload);
 
             if (!uploadError) {

@@ -205,7 +205,7 @@ const CoupleSiteContent = () => {
                                         {couple?.footer_caption || '2026 Valentines'}
                                     </p>
 
-                                    <Link to="/login" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${textClasses.link}`}>
+                                    <Link to="/" className={`px-6 py-2 border rounded-full text-[10px] transition-all uppercase tracking-[0.3em] ${textClasses.link}`}>
                                         Studio Access
                                     </Link>
                                 </div>
