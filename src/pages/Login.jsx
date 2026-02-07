@@ -150,6 +150,14 @@ const Login = () => {
                 <p className="text-[10px] text-center text-accent/60 mt-8 uppercase tracking-[0.2em]">
                     Secure Access • Your Story, Your Control
                 </p>
+                <p className="text-xs text-center mt-3">
+                    <a
+                        href="mailto:virality.ventures.apps@gmail.com"
+                        className="text-stone-400 hover:text-primary transition-colors"
+                    >
+                        Need help?
+                    </a>
+                </p>
             </motion.div>
         </div>
     );

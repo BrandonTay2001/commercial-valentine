@@ -77,7 +77,7 @@ const Admin = () => {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        navigate('/login', { replace: true });
+        navigate('/', { replace: true });
     };
 
     const [bgUploading, setBgUploading] = useState(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { BsShieldLock, BsGearWideConnected, BsGripVertical, BsPlus, BsBoxArrowUpRight, BsEnvelope } from 'react-icons/bs';
+import { BsShieldLock, BsGearWideConnected, BsGripVertical, BsPlus, BsBoxArrowUpRight, BsEnvelope, BsCreditCard } from 'react-icons/bs';
 import { supabase } from '../../lib/supabase';
 
 const Sidebar = ({
@@ -120,13 +120,6 @@ const Sidebar = ({
                             </a>
                         )}
                         <div className="flex gap-2">
-                            <button
-                                onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/'); })}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-medium group"
-                            >
-                                <BsShieldLock className="text-lg group-hover:scale-110 transition-transform" />
-                                <span>Logout</span>
-                            </button>
                             <a
                                 href="mailto:virality.ventures.apps@gmail.com"
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-primary hover:bg-primary/5 transition-all text-sm font-medium group"
@@ -134,7 +127,23 @@ const Sidebar = ({
                                 <BsEnvelope className="text-lg group-hover:scale-110 transition-transform" />
                                 <span>Help</span>
                             </a>
+                            <a
+                                href={import.meta.env.VITE_STRIPE_CUSTOMER_PORTAL_LINK}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-primary hover:bg-primary/5 transition-all text-sm font-medium group"
+                            >
+                                <BsCreditCard className="text-lg group-hover:scale-110 transition-transform" />
+                                <span>Billing</span>
+                            </a>
                         </div>
+                        <button
+                            onClick={onLogout || (() => { sessionStorage.removeItem('isAuthenticated'); navigate('/'); })}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-medium group"
+                        >
+                            <BsShieldLock className="text-lg group-hover:scale-110 transition-transform" />
+                            <span>Logout</span>
+                        </button>
                     </div>
                 </motion.div>
             )}
