@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BsArrowLeft, BsMenuButtonWide, BsX, BsBoxArrowRight } from 'react-icons/bs';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import { compressImage } from '../utils/imageCompression';
 import Sidebar from '../components/admin/Sidebar';
 import SiteSettings from '../components/admin/SiteSettings';
 import LocationEditor from '../components/admin/LocationEditor';
+import UnsavedChangesDialog from '../components/admin/UnsavedChangesDialog';
 
 const Admin = () => {
     const navigate = useNavigate();
@@ -20,6 +21,12 @@ const Admin = () => {
     const [optimizing, setOptimizing] = useState(false);
     const [optProgress, setOptProgress] = useState({ current: 0, total: 0 });
     const [couple, setCouple] = useState(null);
+
+    // Unsaved changes tracking
+    const [originalSettings, setOriginalSettings] = useState(null);
+    const [originalCheckpoint, setOriginalCheckpoint] = useState(null);
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+    const [pendingAction, setPendingAction] = useState(null);
 
     useEffect(() => {
         checkAuthAndFetchData();
@@ -82,6 +89,122 @@ const Admin = () => {
         await supabase.auth.signOut();
     };
 
+    // Track original settings when tab switches to settings
+    useEffect(() => {
+        if (activeTab === 'settings' && settings) {
+            setOriginalSettings(JSON.stringify(settings));
+        }
+    }, [activeTab, settings?.id]);
+
+    // Track original checkpoint when selected checkpoint changes
+    useEffect(() => {
+        if (activeTab === 'locations' && checkpoints[selectedCpIndex]) {
+            setOriginalCheckpoint(JSON.stringify(checkpoints[selectedCpIndex]));
+        }
+    }, [activeTab, selectedCpIndex, checkpoints[selectedCpIndex]?.id]);
+
+    // Check if current section has unsaved changes
+    const hasUnsavedChanges = useCallback(() => {
+        if (activeTab === 'settings' && settings && originalSettings) {
+            return JSON.stringify(settings) !== originalSettings;
+        }
+        if (activeTab === 'locations' && checkpoints[selectedCpIndex] && originalCheckpoint) {
+            return JSON.stringify(checkpoints[selectedCpIndex]) !== originalCheckpoint;
+        }
+        return false;
+    }, [activeTab, settings, originalSettings, checkpoints, selectedCpIndex, originalCheckpoint]);
+
+    // Handle save from dialog
+    const handleDialogSave = async () => {
+        let success = false;
+
+        if (activeTab === 'settings') {
+            const result = await saveSettings();
+            success = result.success;
+            if (success) {
+                setOriginalSettings(JSON.stringify(settings));
+            }
+        } else if (activeTab === 'locations' && checkpoints[selectedCpIndex]) {
+            const result = await saveCheckpoint(checkpoints[selectedCpIndex]);
+            success = result.success;
+            if (success) {
+                setOriginalCheckpoint(JSON.stringify(checkpoints[selectedCpIndex]));
+            }
+        }
+
+        if (success && pendingAction) {
+            executePendingAction();
+        } else {
+            setShowUnsavedDialog(false);
+            setPendingAction(null);
+        }
+    };
+
+    // Handle discard from dialog
+    const handleDialogDiscard = () => {
+        // Revert changes
+        if (activeTab === 'settings' && originalSettings) {
+            const original = JSON.parse(originalSettings);
+            setSettings(original);
+            setCouple(original);
+        } else if (activeTab === 'locations' && originalCheckpoint) {
+            const original = JSON.parse(originalCheckpoint);
+            const newCheckpoints = [...checkpoints];
+            newCheckpoints[selectedCpIndex] = original;
+            setCheckpoints(newCheckpoints);
+        }
+
+        if (pendingAction) {
+            executePendingAction();
+        } else {
+            setShowUnsavedDialog(false);
+            setPendingAction(null);
+        }
+    };
+
+    // Handle cancel from dialog
+    const handleDialogCancel = () => {
+        setShowUnsavedDialog(false);
+        setPendingAction(null);
+    };
+
+    // Execute the pending action after save/discard
+    const executePendingAction = () => {
+        const action = pendingAction;
+        setShowUnsavedDialog(false);
+        setPendingAction(null);
+
+        if (action?.type === 'switchTab') {
+            setActiveTab(action.tab);
+        } else if (action?.type === 'selectCheckpoint') {
+            setSelectedCpIndex(action.index);
+        }
+    };
+
+    // Wrapper for tab switching that checks for unsaved changes
+    const handleTabSwitch = useCallback((newTab) => {
+        if (newTab === activeTab) return;
+
+        if (hasUnsavedChanges()) {
+            setPendingAction({ type: 'switchTab', tab: newTab });
+            setShowUnsavedDialog(true);
+        } else {
+            setActiveTab(newTab);
+        }
+    }, [activeTab, hasUnsavedChanges]);
+
+    // Wrapper for checkpoint selection that checks for unsaved changes
+    const handleCheckpointSelect = useCallback((index) => {
+        if (index === selectedCpIndex) return;
+
+        if (hasUnsavedChanges()) {
+            setPendingAction({ type: 'selectCheckpoint', index });
+            setShowUnsavedDialog(true);
+        } else {
+            setSelectedCpIndex(index);
+        }
+    }, [selectedCpIndex, hasUnsavedChanges]);
+
     const [bgUploading, setBgUploading] = useState(false);
 
     const uploadBg = async (e) => {
@@ -139,6 +262,8 @@ const Admin = () => {
         if (isNew && data) {
             await fetchData(couple.id);
         }
+        // Reset the snapshot after successful save
+        setOriginalCheckpoint(JSON.stringify(checkpoint));
         return { success: true, errors: {} };
     };
 
@@ -151,6 +276,8 @@ const Admin = () => {
         if (error) {
             return { success: false, error: error.message };
         }
+        // Reset the snapshot after successful save
+        setOriginalSettings(JSON.stringify(settings));
         return { success: true };
     };
 
@@ -272,12 +399,12 @@ const Admin = () => {
                 sidebarOpen={sidebarOpen}
                 setSidebarOpen={setSidebarOpen}
                 activeTab={activeTab}
-                setActiveTab={setActiveTab}
+                setActiveTab={handleTabSwitch}
                 checkpoints={checkpoints}
                 setCheckpoints={setCheckpoints}
                 handleReorder={handleReorder}
                 selectedCpIndex={selectedCpIndex}
-                setSelectedCpIndex={setSelectedCpIndex}
+                setSelectedCpIndex={handleCheckpointSelect}
                 navigate={navigate}
                 couple={couple}
                 onLogout={handleLogout}
@@ -322,6 +449,14 @@ const Admin = () => {
             {/* <button onClick={() => navigate(`/${couple?.path || ''}`)} className="fixed bottom-6 left-6 md:left-auto md:right-8 p-4 bg-white rounded-full shadow-xl border border-stone-100 text-stone-400 hover:text-primary transition-all hover:scale-110 z-[60] active:scale-95">
                 <BsArrowLeft className="text-xl" />
             </button> */}
+
+            {/* Unsaved Changes Dialog */}
+            <UnsavedChangesDialog
+                isOpen={showUnsavedDialog}
+                onSave={handleDialogSave}
+                onDiscard={handleDialogDiscard}
+                onCancel={handleDialogCancel}
+            />
         </div>
     );
 };

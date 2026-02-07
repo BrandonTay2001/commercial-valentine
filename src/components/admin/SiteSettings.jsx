@@ -111,7 +111,7 @@ const SiteSettings = ({
                             <div className="flex justify-between items-center px-1">
                                 <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">Zoom Level (Altitude)</label>
                                 <span className="text-xs font-mono font-bold text-primary bg-white px-2 py-1 rounded-md border border-stone-100">
-                                    {settings?.map_zoom_level || 13}
+                                    {settings?.map_zoom_level || 4}
                                 </span>
                             </div>
                             <input
@@ -120,7 +120,7 @@ const SiteSettings = ({
                                 max="18"
                                 step="0.5"
                                 className="w-full accent-red-400 h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer"
-                                value={settings?.map_zoom_level || 13}
+                                value={settings?.map_zoom_level || 4}
                                 onChange={(e) => updateSettings('map_zoom_level', parseFloat(e.target.value))}
                             />
                             <div className="flex justify-between text-[10px] text-stone-400 font-mono px-1">
@@ -133,7 +133,7 @@ const SiteSettings = ({
                             <div className="flex justify-between items-center px-1">
                                 <label className="text-[10px] uppercase font-bold text-accent/60 tracking-[0.2em] ml-2">3D Pitch (Tilt)</label>
                                 <span className="text-xs font-mono font-bold text-primary bg-white px-2 py-1 rounded-md border border-stone-100">
-                                    {settings?.map_pitch || 0}°
+                                    {settings?.map_pitch || 30}°
                                 </span>
                             </div>
                             <input
@@ -142,7 +142,7 @@ const SiteSettings = ({
                                 max="60"
                                 step="5"
                                 className="w-full accent-red-400 h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer"
-                                value={settings?.map_pitch || 0}
+                                value={settings?.map_pitch || 30}
                                 onChange={(e) => updateSettings('map_pitch', parseFloat(e.target.value))}
                             />
                             <div className="flex justify-between text-[10px] text-stone-400 font-mono px-1">
@@ -252,43 +252,43 @@ const SiteSettings = ({
                         placeholder="2026 Valentines"
                     />
                 </div>
+            </div>
 
-                {/* Save Error */}
-                {saveError && (
-                    <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-2xl">
-                        <p className="text-red-500 text-sm">{saveError}</p>
-                    </div>
-                )}
-
-                {/* Save Button */}
-                <div className="mt-8 flex justify-end">
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className={`px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all flex items-center gap-3 ${saveSuccess
-                            ? 'bg-green-500 text-white'
-                            : 'bg-primary text-white hover:bg-primary/90'
-                            } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        {saving ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Saving...
-                            </>
-                        ) : saveSuccess ? (
-                            <>
-                                <BsCheckCircle className="text-lg" />
-                                Saved!
-                            </>
-                        ) : (
-                            'Save Settings'
-                        )}
-                    </button>
+            {/* Save Error */}
+            {saveError && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
+                    <p className="text-red-500 text-sm">{saveError}</p>
                 </div>
+            )}
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className={`px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all flex items-center gap-3 ${saveSuccess
+                        ? 'bg-green-500 text-white'
+                        : 'bg-primary text-white hover:bg-primary/90'
+                        } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {saving ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Saving...
+                        </>
+                    ) : saveSuccess ? (
+                        <>
+                            <BsCheckCircle className="text-lg" />
+                            Saved!
+                        </>
+                    ) : (
+                        'Save Settings'
+                    )}
+                </button>
             </div>
 
             {/* Maintenance Tool */}
-            <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
+            {/* <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-stone-100 shadow-sm relative overflow-hidden">
                 <h2 className="text-3xl font-serif text-primary mb-6">Maintenance</h2>
                 <p className="text-sm text-stone-400 mb-6 font-sans">
                     Reduce memory usage by optimizing all existing images in your library.
@@ -316,7 +316,7 @@ const SiteSettings = ({
                         Optimize Image Library
                     </button>
                 )}
-            </div>
+            </div> */}
         </div>
     );
 };
