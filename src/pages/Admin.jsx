@@ -29,7 +29,7 @@ const Admin = () => {
         // Check auth session
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-            navigate('/login', { replace: true });
+            navigate('/', { replace: true });
             return;
         }
 
@@ -76,8 +76,10 @@ const Admin = () => {
     };
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        // Navigate first, then sign out to avoid auth check race condition
+        // that would redirect to /login before navigation to / completes
         navigate('/', { replace: true });
+        await supabase.auth.signOut();
     };
 
     const [bgUploading, setBgUploading] = useState(false);

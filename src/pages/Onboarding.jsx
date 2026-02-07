@@ -396,8 +396,8 @@ const Onboarding = () => {
 
                             <div>
                                 <label className="block text-xs font-medium text-secondary mb-1">Your Site Path</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
+                                <div className="relative flex items-center bg-white/40 border border-white/60 rounded-xl focus-within:bg-white/60 focus-within:border-red-200 transition-all">
+                                    <span className="pl-4 text-stone-400 text-sm whitespace-nowrap flex-shrink-0">
                                         {window.location.host}/
                                     </span>
                                     <input
@@ -405,7 +405,7 @@ const Onboarding = () => {
                                         value={path}
                                         onChange={(e) => setPath(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                                         placeholder="sarah-james"
-                                        className="w-full bg-white/40 border border-white/60 rounded-xl pl-32 pr-10 py-3 outline-none focus:bg-white/60 focus:border-red-200 transition-all"
+                                        className="flex-1 bg-transparent pr-10 py-3 outline-none min-w-0"
                                         required
                                     />
                                     {checkingPath ? (
