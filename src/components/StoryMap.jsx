@@ -476,7 +476,7 @@ const StoryMap = ({ mapStylePreset, globalZoom = 13, globalPitch = 0, coupleId =
                         initial={{ opacity: 0, x: 50 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 50 }}
-                        className={`absolute right-10 top-1/2 -translate-y-1/2 w-80 backdrop-blur-md border rounded-3xl p-10 z-20 hidden lg:block ${theme.glass}`}
+                        className={`absolute right-10 top-1/2 -translate-y-1/2 w-80 max-h-[50vh] overflow-y-auto backdrop-blur-md border rounded-3xl p-10 z-20 hidden lg:block custom-scrollbar ${theme.glass}`}
                     >
                         <h3 className={`text-display text-4xl mb-4 leading-tight ${theme.textPrimary}`}>{currentCp.title}</h3>
                         <p className={`font-serif italic text-lg mb-8 leading-relaxed ${theme.textSecondary}`}>
