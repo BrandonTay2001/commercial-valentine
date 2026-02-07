@@ -52,13 +52,13 @@ const Onboarding = () => {
             }
         };
 
-        // Validate Stripe session if provided
+        // Validate Stripe session - REQUIRED for signup
         const sessionId = searchParams.get('session_id');
         if (sessionId) {
             validateStripeSession(sessionId);
         } else {
-            // No session ID - allow proceeding (for demo/testing)
-            setStripeValidated(true);
+            // No session ID - block signup, require purchase first
+            setError('A valid purchase is required to create an account. Please complete checkout first.');
         }
 
         checkAuth();
@@ -297,6 +297,31 @@ const Onboarding = () => {
                                 <div className="py-8 text-center">
                                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                                     <p className="text-sm text-secondary">Validating your subscription...</p>
+                                </div>
+                            ) : !stripeValidated && error ? (
+                                <div className="py-8 text-center space-y-4">
+                                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                                        <p className="text-sm text-red-700 font-medium">Purchase Required</p>
+                                        <p className="text-xs text-red-600 mt-1">{error}</p>
+                                    </div>
+                                    <motion.a
+                                        href={import.meta.env.VITE_LANDING_PAGE_URL || '/'}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="inline-block w-full py-3 bg-primary text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all text-center"
+                                    >
+                                        Get Started
+                                    </motion.a>
+                                    <p className="text-xs text-center text-secondary">
+                                        Already have an account?{' '}
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/login')}
+                                            className="text-primary font-medium hover:underline"
+                                        >
+                                            Sign In
+                                        </button>
+                                    </p>
                                 </div>
                             ) : (
                                 <>
